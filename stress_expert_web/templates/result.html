@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stress Assessment Result</title>
+    <style>
+        :root {
+            --primary:#3498db; --primary-dark:#2980b9;
+            --gray-light:#e9ecef; --border-radius:10px;
+            --box-shadow:0 6px 15px rgba(0,0,0,0.1);
+        }
+
+        body { font-family:'Segoe UI'; background:linear-gradient(135deg,#f5f7fa,#c3cfe2); padding:20px; }
+        .container { max-width: 900px; margin: auto; }
+
+        header {
+            background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+            color:white; padding:25px; text-align:center;
+            border-radius:var(--border-radius); box-shadow:var(--box-shadow);
+        }
+
+        .card {
+            background:white; margin-top:25px; padding:25px;
+            border-radius:var(--border-radius); box-shadow:var(--box-shadow);
+        }
+
+        .stress-box {
+            padding:20px; border-radius:var(--border-radius);
+            text-align:center; font-size:1.6rem; font-weight:bold; margin-bottom:20px;
+        }
+
+        .low { background:#d4edda; color:#155724; }
+        .moderate { background:#fff3cd; color:#856404; }
+        .high { background:#f8d7da; color:#721c24; }
+        .very-high { background:#f5c6cb; color:#721c24; }
+
+        ul { margin-left:20px; }
+
+        a { display:inline-block; margin-top:15px; text-decoration:none; color:var(--primary-dark); }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1>Stress Assessment Result</h1>
+    </header>
+
+    <div class="card">
+        {# 根据 stress_level 选择 css class #}
+        {% set cls = 'low' %}
+        {% if stress_level == 'Moderate' %}
+            {% set cls = 'moderate' %}
+        {% elif stress_level == 'High' %}
+            {% set cls = 'high' %}
+        {% elif stress_level == 'Very High' %}
+            {% set cls = 'very-high' %}
+        {% endif %}
+
+        <div class="stress-box {{ cls }}">
+            Your Stress Level: {{ stress_level }}
+        </div>
+
+        <p><strong>Advice:</strong> {{ advice }}</p>
+        <p><strong>Overall stress score (1–5):</strong> {{ overall }}</p>
+
+        <hr>
+
+        <h3>Your Answers (1–5)</h3>
+        <ul>
+            <li>Anxiety Level: {{ scores.anxiety_level }}</li>
+            <li>Self-esteem: {{ scores.self_esteem }}</li>
+            <li>Depression: {{ scores.depression }}</li>
+            <li>Sleep Quality: {{ scores.sleep_quality }}</li>
+            <li>Study Load: {{ scores.study_load }}</li>
+        </ul>
+
+        <h3>Converted Stress Scores (1–5)</h3>
+        <ul>
+            <li>Anxiety Level: {{ stress_scores.anxiety_level }}</li>
+            <li>Self-esteem (reversed): {{ stress_scores.self_esteem }}</li>
+            <li>Depression: {{ stress_scores.depression }}</li>
+            <li>Sleep Quality (reversed): {{ stress_scores.sleep_quality }}</li>
+            <li>Study Load: {{ stress_scores.study_load }}</li>
+        </ul>
+
+        <h3>Triggered CLIPS Rule</h3>
+        <p>{{ triggered_rule }}</p>
+
+        <a href="/">&#8592; Back to Assessment</a>
+    </div>
+</div>
+</body>
+</html>

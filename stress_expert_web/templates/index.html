@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Stress Detection System</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-dark: #2980b9;
+            --secondary: #2ecc71;
+            --secondary-dark: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --info: #9b59b6;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --border-radius: 10px;
+            --box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-radius: var(--border-radius);
+            margin-bottom: 30px;
+            box-shadow: var(--box-shadow);
+        }
+
+        header h1 { font-size: 2.8rem; margin-bottom: 15px; font-weight: 700; }
+
+        .card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+        }
+
+        .card:hover { transform: translateY(-5px); }
+
+        .card-title {
+            font-size: 1.6rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--gray-light);
+            padding-bottom: 10px;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            padding: 14px 28px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            cursor: pointer;
+            display: block;
+            width: 100%;
+            font-size: 1.15rem;
+            font-weight: 600;
+            border: none;
+            transition: var(--transition);
+        }
+
+        .btn:hover { background: var(--primary-dark); transform: translateY(-3px); }
+
+        .form-group { margin-bottom: 25px; }
+        .question-text { font-size: 1.15rem; margin-bottom: 10px; }
+
+        .radio-group {
+            display: flex;
+            justify-content: space-between;
+            background: var(--light);
+            padding: 15px;
+            border-radius: var(--border-radius);
+        }
+
+        .radio-option { text-align: center; flex: 1; }
+        .radio-option input { transform: scale(1.3); margin-bottom: 5px; }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <header>
+        <h1>Student Stress Detection System</h1>
+        <p class="subtitle">Assess Your Stress Level and Get Personalized Recommendations</p>
+    </header>
+
+    <div class="card" id="intro-section">
+        <h2 class="card-title">Welcome</h2>
+        <p>This system evaluates your stress level across different aspects such as mental, physical, environment, academic and social factors.</p>
+        <button class="btn" id="start-btn">Start Assessment</button>
+    </div>
+
+    <!-- 用 form 包起来，提交到 /diagnose -->
+    <div class="card" id="form-section" style="display:none;">
+        <form id="stress-form" action="/diagnose" method="POST">
+            <h2 class="card-title">Personal Information</h2>
+            <div class="form-group">
+                <label>Your Name (optional)</label>
+                <input type="text" name="student_name" class="form-control"
+                       style="padding:8px;width:100%;border-radius:8px;border:1px solid #ccc;">
+            </div>
+
+            <h2 class="card-title">Stress Assessment Questionnaire</h2>
+            <p>Please answer all questions based on a 1–5 scale.</p>
+
+            <div id="questions-container"></div>
+
+            <button class="btn btn-submit" type="submit">Submit Assessment</button>
+        </form>
+    </div>
+</div>
+
+<footer>
+    Student Stress Detection System © 2024
+</footer>
+
+<script>
+    const QUESTIONS = {
+        anxiety_level: "How often do you feel anxious?",
+        self_esteem: "How confident do you feel about yourself?",
+        depression: "How often do you feel depressed?",
+        sleep_quality: "How is your sleep quality?",
+        study_load: "How heavy is your study load?"
+    };
+
+    document.getElementById("start-btn").onclick = () => {
+        document.getElementById("intro-section").style.display = "none";
+        document.getElementById("form-section").style.display = "block";
+    };
+
+    function generateQuestions() {
+        const container = document.getElementById("questions-container");
+        for (const [key, text] of Object.entries(QUESTIONS)) {
+            const div = document.createElement("div");
+            div.className = "form-group";
+            div.innerHTML = `
+                <div class="question-text">${text}</div>
+                <div class="radio-group">
+                    ${[1,2,3,4,5].map(i => `
+                        <div class="radio-option">
+                            <input type="radio" name="${key}" value="${i}" required>
+                            <label>${i}</label>
+                        </div>`).join("")}
+                </div>`;
+            container.appendChild(div);
+        }
+    }
+
+    generateQuestions();
+</script>
+
+</body>
+</html>
