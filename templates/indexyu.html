@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Stress Detection System with CLIPS Expert System</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-dark: #2980b9;
+            --secondary: #2ecc71;
+            --secondary-dark: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --info: #9b59b6;
+            --clips-color: #8e44ad;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --border-radius: 10px;
+            --box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-radius: var(--border-radius);
+            margin-bottom: 30px;
+            box-shadow: var(--box-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+            background-size: cover;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+            position: relative;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            position: relative;
+        }
+
+        .clips-badge {
+            display: inline-block;
+            background: var(--clips-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+
+        .card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 30px;
+            margin-bottom: 30px;
+            transition: var(--transition);
+            border: none;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-title {
+            font-size: 1.6rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--gray-light);
+            padding-bottom: 12px;
+            font-weight: 600;
+        }
+
+        /* 修改 .form-group 样式 */
+        .form-group {
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .form-group:last-child {
+            border-bottom: none;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 1.05rem;
+            min-width: 200px;
+            margin-bottom: 0;
+            padding-right: 20px;
+        }
+
+        /* 调整输入框容器 */
+        .form-control-container {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        /* 输入框样式 - 保持现有但调整间距 */
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: var(--transition);
+            background-color: white;
+            box-sizing: border-box;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .form-group {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 15px 0;
+            }
+            
+            .form-group label {
+                min-width: 100%;
+                margin-bottom: 8px;
+                padding-right: 0;
+                font-size: 1rem;
+            }
+            
+            .form-control-container {
+                min-width: 100%;
+                width: 100%;
+            }
+        }
+
+        /* 确保姓名输入框样式一致 */
+        #student-name {
+            width: 100% !important;
+            max-width: 400px;
+        }
+        .question-text {
+            font-size: 1.15rem;
+            margin-bottom: 10px;
+            color: var(--dark);
+            font-weight: 500;
+        }
+
+        .scale-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            color: var(--gray);
+            font-weight: 500;
+        }
+
+        .radio-group {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background: var(--light);
+            padding: 15px;
+            border-radius: var(--border-radius);
+        }
+
+        .radio-option {
+            text-align: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .radio-option input {
+            margin-bottom: 8px;
+            transform: scale(1.3);
+            cursor: pointer;
+        }
+
+        .radio-option label {
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-bottom: 0;
+            font-weight: normal;
+        }
+
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: var(--transition);
+            text-align: center;
+            text-decoration: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+
+        .btn-success {
+            background: var(--secondary);
+        }
+
+        .btn-success:hover {
+            background: var(--secondary-dark);
+        }
+
+        .btn-clips {
+            background: var(--clips-color);
+        }
+
+        .btn-clips:hover {
+            background: #7d3c98;
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .stress-level {
+            text-align: center;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: var(--transition);
+        }
+
+        .low-stress {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .moderate-stress {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }
+
+        .high-stress {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        .very-high-stress {
+            background: linear-gradient(135deg, #f5c6cb, #f1b0b7);
+            color: #721c24;
+            border: 2px solid #f1b0b7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .reasons-list {
+            list-style-type: none;
+        }
+
+        .reasons-list li {
+            padding: 12px 18px;
+            margin-bottom: 12px;
+            border-left: 5px solid var(--primary);
+            background-color: var(--light);
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+            transition: var(--transition);
+        }
+
+        .reasons-list li:hover {
+            transform: translateX(5px);
+            background-color: #e9ecef;
+        }
+
+        .section-reasons {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--gray-light);
+            font-weight: 600;
+        }
+
+        .rule-trace {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-left: 5px solid var(--warning);
+            padding: 20px;
+            margin-top: 25px;
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .progress-bar {
+            height: 22px;
+            background-color: #e9ecef;
+            border-radius: 11px;
+            margin: 18px 0;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 11px;
+            transition: width 0.7s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background-image: linear-gradient(
+                -45deg,
+                rgba(255, 255, 255, 0.2) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.2) 50%,
+                rgba(255, 255, 255, 0.2) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 20px 20px;
+            animation: move 1s linear infinite;
+        }
+
+        @keyframes move {
+            0% { background-position: 0 0; }
+            100% { background-position: 20px 0; }
+        }
+
+        .progress-low {
+            background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+        }
+
+        .progress-moderate {
+            background: linear-gradient(135deg, var(--warning), #e67e22);
+        }
+
+        .progress-high {
+            background: linear-gradient(135deg, var(--danger), #c0392b);
+        }
+
+        .tab-container {
+            margin-top: 25px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--gray-light);
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-bottom: none;
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+            margin-right: 5px;
+            transition: var(--transition);
+            font-weight: 500;
+            background: var(--light);
+            margin-bottom: 5px;
+        }
+
+        .tab.active {
+            background: white;
+            border-color: var(--gray-light) var(--gray-light) white;
+            color: var(--primary);
+            font-weight: bold;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .tab:hover:not(.active) {
+            background: #e9ecef;
+            color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 25px;
+            background: white;
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            box-shadow: var(--box-shadow);
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .clips-system {
+            background: linear-gradient(135deg, #f0e6f5, #e8d6f1);
+            border-left: 5px solid var(--clips-color);
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+        }
+
+        .clips-result-item {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            border-left: 4px solid var(--clips-color);
+        }
+
+        .clips-result-item::before {
+            content: "•";
+            color: var(--clips-color);
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+
+        .score-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: var(--border-radius);
+        }
+
+        .score-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .score-label {
+            font-size: 1.1rem;
+            color: var(--gray);
+        }
+
+        .rule-item {
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid var(--info);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .symptom-tag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .clips-tag {
+            display: inline-block;
+            background: #f3e5f5;
+            color: var(--clips-color);
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 25px;
+            color: var(--gray);
+            font-size: 0.95rem;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .radio-option {
+                flex-direction: row;
+                justify-content: flex-start;
+                text-align: left;
+                padding: 8px 0;
+            }
+            
+            .radio-option input {
+                margin-right: 10px;
+                margin-bottom: 0;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                border-radius: 0;
+                margin-right: 0;
+                border: 1px solid var(--gray-light);
+                border-bottom: none;
+                width: 100%;
+            }
+            
+            .tab:last-child {
+                border-bottom: 1px solid var(--gray-light);
+            }
+            
+            .score-display {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .score-value {
+                margin-bottom: 5px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .form-control {
+                padding: 10px 12px;
+            }
+        }
+
+        /* 确保所有输入框样式一致 */
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            background-color: white;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        /* 高优先级样式确保输入框显示正确 */
+        #form-section .form-group input#student-name {
+            width: 100% !important;
+            padding: 12px 15px !important;
+            border: 2px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            background-color: white !important;
+            box-sizing: border-box !important;
+            margin-top: 5px !important;
+            display: block !important;
+            line-height: 1.5 !important;
+        }
+
+        #form-section .form-group input#student-name:focus {
+            outline: none !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Student Stress Detection System</h1>
+            <p class="subtitle">Advanced CLIPS Expert System for Stress Assessment</p>
+            <div class="clips-badge">Powered by CLIPS Expert System</div>
+        </header>
+
+        <div class="card" id="intro-section">
+            <h2 class="card-title">Welcome to the Student Stress Detection System</h2>
+            <p>This system uses an advanced <strong>CLIPS Expert System</strong> to evaluate your stress level by analyzing multiple aspects of your life, including mental health, physical condition, environmental factors, academic pressure, and social support.</p>
+            
+            <div class="clips-system" style="margin: 20px 0;">
+                <h3>About the Expert System:</h3>
+                <p>The system uses a rule-based inference engine that:</p>
+                <ul style="padding-left: 20px; margin-top: 10px;">
+                    <li>Analyzes symptom patterns using 20+ expert rules</li>
+                    <li>Provides detailed rule traceability and explanations</li>
+                    <li>Generates personalized recommendations based on stress level</li>
+                    <li>Uses forward chaining to infer conclusions from symptoms</li>
+                </ul>
+            </div>
+            
+            <p>Please answer the following questions based on your actual situation. The system will provide you with detailed assessment results and expert recommendations.</p>
+            <button class="btn btn-block" id="start-btn" style="margin-top: 25px;">Start Assessment</button>
+        </div>
+
+        <div class="card" id="form-section" style="display: none;">
+            <h2 class="card-title">Personal Information</h2>
+            <div class="form-group">
+                <label for="student-name">Your Name (optional)</label>
+                <div class="form-control-container">
+                    <input type="text" id="student-name" name="student_name" class="form-control" placeholder="Enter your name here">
+                </div>
+            </div>
+
+            <h2 class="card-title" style="margin-top: 30px;">Stress Assessment Questionnaire</h2>
+            <p>Please select the option that best matches your situation (1-5 points)</p>
+
+            <div id="questions-container">
+                <!-- Questions will be dynamically generated by JavaScript -->
+            </div>
+
+            <button class="btn btn-success btn-block" id="submit-btn">Submit Assessment</button>
+        </div>
+
+        <div class="card result-section" id="result-section">
+            <h2 class="card-title">Assessment Results</h2>
+            
+            <div id="stress-level-display" class="stress-level">
+                <!-- Stress level will be dynamically generated by JavaScript -->
+            </div>
+
+            <div class="score-display">
+                <div>
+                    <div class="score-label">CLIPS Expert System Score</div>
+                    <div class="score-value" id="clips-score">0.0</div>
+                </div>
+                <div>
+                    <div class="score-label">Total Response Score</div>
+                    <div class="score-value" id="total-score">0</div>
+                    <div class="score-label">out of <span id="max-score">0</span></div>
+                </div>
+            </div>
+
+            <div class="tab-container">
+                <div class="tabs">
+                    <div class="tab active" data-tab="summary">Summary</div>
+                    <div class="tab" data-tab="clips">CLIPS Analysis</div>
+                    <div class="tab" data-tab="symptoms">Symptoms</div>
+                    <div class="tab" data-tab="rules">Rules Triggered</div>
+                    <div class="tab" data-tab="recommendations">Recommendations</div>
+                </div>
+
+                <div class="tab-content active" id="summary-tab">
+                    <h3>Stress Source Analysis</h3>
+                    <div id="section-reasons">
+                        <!-- Stress reasons by section will be dynamically generated by JavaScript -->
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;">Traditional Rule Engine Results</h3>
+                    <div id="rule-results">
+                        <!-- Traditional rule results will be dynamically generated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="tab-content" id="clips-tab">
+                    <h3>CLIPS Expert System Analysis</h3>
+                    <div class="clips-system">
+                        <h4>Inference Process</h4>
+                        <div id="clips-results">
+                            <!-- CLIPS expert system results will be dynamically generated by JavaScript -->
+                        </div>
+                        
+                        <h4 style="margin-top: 25px;">Detected Symptoms</h4>
+                        <div id="symptoms-list">
+                            <!-- Symptoms will be dynamically generated by JavaScript -->
+                        </div>
+                        
+                        <h4 style="margin-top: 25px;">Stress Level Calculation</h4>
+                        <div id="stress-calculation">
+                            <!-- Stress calculation details will be dynamically generated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="symptoms-tab">
+                    <h3>Detected Symptoms and Facts</h3>
+                    <div id="symptoms-detailed">
+                        <!-- Detailed symptoms will be dynamically generated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="tab-content" id="rules-tab">
+                    <h3>Rules Triggered in Expert System</h3>
+                    <div id="rules-triggered">
+                        <!-- Rules triggered will be dynamically generated by JavaScript -->
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;">Traditional Rule Engine</h3>
+                    <div id="traditional-rules">
+                        <!-- Traditional rules triggered will be dynamically generated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="tab-content" id="recommendations-tab">
+                    <h3>Personalized Recommendations</h3>
+                    <div id="recommendations-content">
+                        <!-- Recommendations content will be dynamically generated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="rule-trace">
+                <h3>Assessment Overview</h3>
+                <div id="assessment-overview">
+                    <!-- Overview content will be dynamically generated by JavaScript -->
+                </div>
+            </div>
+
+            <button class="btn btn-block btn-clips" id="restart-btn" style="margin-top: 25px;">Restart Assessment</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>Student Stress Detection System with CLIPS Expert System &copy; 2023 | Assessment results are for reference only. Please consult professional mental health services if needed.</p>
+    </footer>
+
+    <script>
+        // Questions and answer options
+        const QUESTIONS = {
+            'anxiety_level': "How often do you feel anxious or tense?",
+            'self_esteem': "How confident do you feel about yourself?",
+            'mental_health_history': "Do you have a history of mental health issues?",
+            'depression': "How often do you feel depressed or hopeless?",
+            'headache': "How often do you experience headaches?",
+            'blood_pressure': "How is your blood pressure level recently?",
+            'sleep_quality': "How would you rate your sleep quality?",
+            'breathing_problem': "Do you experience breathing difficulties?",
+            'noise_level': "How noisy is your living or study environment?",
+            'living_conditions': "How comfortable are your living conditions?",
+            'safety': "How safe do you feel in your environment?",
+            'basic_needs': "Are your basic needs (food, rest, hygiene) well supported?",
+            'academic_performance': "How satisfied are you with your academic performance?",
+            'study_load': "How heavy is your study load?",
+            'teacher_student_relationship': "How is your relationship with teachers?",
+            'future_career_concerns': "How worried are you about your future career?",
+            'social_support': "How much social support do you receive?",
+            'peer_pressure': "How strong is the peer pressure you feel?",
+            'extracurricular_activities': "How often do you join extracurricular activities?",
+            'bullying': "Have you experienced bullying?"
+        };
+
+        const ANSWER_SCALE = {
+            1: "Never / Very Good",
+            2: "Rarely / Good",
+            3: "Sometimes / Average",
+            4: "Often / Poor",
+            5: "Always / Very Poor"
+        };
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate question form
+            generateQuestionForm();
+            
+            // Bind events
+            document.getElementById('start-btn').addEventListener('click', startAssessment);
+            document.getElementById('submit-btn').addEventListener('click', submitAssessment);
+            document.getElementById('restart-btn').addEventListener('click', restartAssessment);
+            
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Remove all active tabs
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    // Activate current tab
+                    this.classList.add('active');
+                    document.getElementById(this.dataset.tab + '-tab').classList.add('active');
+                });
+            });
+        });
+
+        // Start assessment
+        function startAssessment() {
+            document.getElementById('intro-section').style.display = 'none';
+            document.getElementById('form-section').style.display = 'block';
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Generate question form
+        function generateQuestionForm() {
+            const container = document.getElementById('questions-container');
+            
+            for (const [key, question] of Object.entries(QUESTIONS)) {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'form-group';
+                
+                const questionText = document.createElement('div');
+                questionText.className = 'question-text';
+                questionText.textContent = question;
+                questionDiv.appendChild(questionText);
+                
+                const scaleLabels = document.createElement('div');
+                scaleLabels.className = 'scale-labels';
+                
+                for (let i = 1; i <= 5; i++) {
+                    const label = document.createElement('span');
+                    label.textContent = `${i}: ${ANSWER_SCALE[i]}`;
+                    scaleLabels.appendChild(label);
+                }
+                
+                questionDiv.appendChild(scaleLabels);
+                
+                const radioGroup = document.createElement('div');
+                radioGroup.className = 'radio-group';
+                
+                for (let i = 1; i <= 5; i++) {
+                    const radioOption = document.createElement('div');
+                    radioOption.className = 'radio-option';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'radio';
+                    input.name = key;
+                    input.value = i;
+                    input.id = `${key}_${i}`;
+                    input.required = true;
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `${key}_${i}`;
+                    label.textContent = i;
+                    
+                    radioOption.appendChild(input);
+                    radioOption.appendChild(label);
+                    radioGroup.appendChild(radioOption);
+                }
+                
+                questionDiv.appendChild(radioGroup);
+                container.appendChild(questionDiv);
+            }
+        }
+
+        // Submit assessment
+        async function submitAssessment() {
+            const nameInput = document.getElementById('student-name');
+            const name = nameInput ? nameInput.value.trim() : '';
+            
+            // 名字改为可选，如果没有输入则使用默认值
+            const displayName = name || 'Anonymous Student';
+            
+            // Collect responses
+            const responses = {};
+            let allAnswered = true;
+            let unansweredQuestions = [];
+            
+            for (const key of Object.keys(QUESTIONS)) {
+                const selected = document.querySelector(`input[name="${key}"]:checked`);
+                if (selected) {
+                    responses[key] = parseInt(selected.value);
+                } else {
+                    allAnswered = false;
+                    unansweredQuestions.push(key);
+                }
+            }
+            
+            if (!allAnswered) {
+                alert(`Please answer all questions. Missing answers for ${unansweredQuestions.length} question(s).`);
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submit-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Processing with CLIPS Expert System...';
+            submitBtn.disabled = true;
+            
+            try {
+                // Send data to backend
+                const response = await fetch('/assess', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: displayName, // 使用显示名字
+                        responses: responses
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Display results
+                displayResults(data);
+                
+                // Switch to results page
+                document.getElementById('form-section').style.display = 'none';
+                document.getElementById('result-section').style.display = 'block';
+                
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred during assessment. Please try again.');
+            } finally {
+                // Reset button
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Display results
+        function displayResults(result) {
+            // Display stress level
+            const stressDisplay = document.getElementById('stress-level-display');
+            const finalStress = result.final_stress || result.clips_stress_level || 'Undetermined';
+            stressDisplay.textContent = `${result.name}'s Stress Level: ${finalStress}`;
+            
+            // Set appropriate class based on stress level
+            let stressClass = 'low-stress';
+            const stressLevel = finalStress.toLowerCase();
+            if (stressLevel.includes('very high')) stressClass = 'very-high-stress';
+            else if (stressLevel.includes('high')) stressClass = 'high-stress';
+            else if (stressLevel.includes('moderate')) stressClass = 'moderate-stress';
+            
+            stressDisplay.className = `stress-level ${stressClass}`;
+            
+            // Display scores
+            if (result.expert_system && result.expert_system.overall_score) {
+                document.getElementById('clips-score').textContent = result.expert_system.overall_score.toFixed(1);
+            }
+            
+            document.getElementById('total-score').textContent = result.total_score || 0;
+            document.getElementById('max-score').textContent = result.max_score || 0;
+            
+            // Display section reasons
+            displaySectionReasons(result);
+            
+            // Display traditional rule results
+            displayRuleResults(result);
+            
+            // Display CLIPS expert system results
+            displayCLIPSResults(result);
+            
+            // Display symptoms
+            displaySymptoms(result);
+            
+            // Display rules triggered
+            displayRulesTriggered(result);
+            
+            // Display recommendations
+            displayRecommendations(result);
+            
+            // Display assessment overview
+            displayAssessmentOverview(result);
+        }
+
+        function displaySectionReasons(result) {
+            const sectionReasonsContainer = document.getElementById('section-reasons');
+            sectionReasonsContainer.innerHTML = '';
+            
+            if (result.section_reasons) {
+                for (const [section, reasons] of Object.entries(result.section_reasons)) {
+                    if (reasons && reasons.length > 0) {
+                        const sectionDiv = document.createElement('div');
+                        sectionDiv.className = 'section-reasons';
+                        
+                        const sectionTitle = document.createElement('div');
+                        sectionTitle.className = 'section-title';
+                        sectionTitle.textContent = section;
+                        sectionDiv.appendChild(sectionTitle);
+                        
+                        const reasonsList = document.createElement('ul');
+                        reasonsList.className = 'reasons-list';
+                        
+                        reasons.forEach(reason => {
+                            const li = document.createElement('li');
+                            li.textContent = reason;
+                            reasonsList.appendChild(li);
+                        });
+                        
+                        sectionDiv.appendChild(reasonsList);
+                        sectionReasonsContainer.appendChild(sectionDiv);
+                    }
+                }
+            }
+        }
+
+        function displayRuleResults(result) {
+            const ruleResultsContainer = document.getElementById('rule-results');
+            ruleResultsContainer.innerHTML = '';
+            
+            if (result.results && result.results.length > 0) {
+                const resultsList = document.createElement('ul');
+                resultsList.className = 'reasons-list';
+                
+                result.results.forEach(resultItem => {
+                    const li = document.createElement('li');
+                    li.textContent = resultItem;
+                    resultsList.appendChild(li);
+                });
+                
+                ruleResultsContainer.appendChild(resultsList);
+            } else {
+                ruleResultsContainer.innerHTML = '<p>No traditional rules triggered.</p>';
+            }
+        }
+
+        function displayCLIPSResults(result) {
+            const clipsResultsContainer = document.getElementById('clips-results');
+            clipsResultsContainer.innerHTML = '';
+            
+            if (result.expert_system) {
+                const expert = result.expert_system;
+                
+                // Stress level
+                const levelDiv = document.createElement('div');
+                levelDiv.className = 'clips-result-item';
+                levelDiv.innerHTML = `<strong>Stress Level:</strong> ${expert.stress_level || 'Undetermined'}`;
+                clipsResultsContainer.appendChild(levelDiv);
+                
+                // Overall score
+                if (expert.overall_score !== undefined) {
+                    const scoreDiv = document.createElement('div');
+                    scoreDiv.className = 'clips-result-item';
+                    scoreDiv.innerHTML = `<strong>Overall Score:</strong> ${expert.overall_score.toFixed(1)}/4.0`;
+                    clipsResultsContainer.appendChild(scoreDiv);
+                }
+                
+                // Explanations
+                if (expert.explanations && expert.explanations.length > 0) {
+                    const explanationsDiv = document.createElement('div');
+                    explanationsDiv.className = 'clips-result-item';
+                    explanationsDiv.innerHTML = `<strong>Inference Explanations:</strong><br>${expert.explanations.join('; ')}`;
+                    clipsResultsContainer.appendChild(explanationsDiv);
+                }
+            }
+        }
+
+        function displaySymptoms(result) {
+            // Display in symptoms tab
+            const symptomsDetailed = document.getElementById('symptoms-detailed');
+            symptomsDetailed.innerHTML = '';
+            
+            // Display in clips tab
+            const symptomsList = document.getElementById('symptoms-list');
+            symptomsList.innerHTML = '';
+            
+            if (result.expert_system) {
+                const expert = result.expert_system;
+                
+                // Symptoms detected
+                if (expert.symptoms_detected && expert.symptoms_detected.length > 0) {
+                    const symptomsDiv = document.createElement('div');
+                    symptomsDiv.innerHTML = '<p>Detected symptoms from questionnaire responses:</p>';
+                    
+                    expert.symptoms_detected.forEach(symptom => {
+                        const tag = document.createElement('span');
+                        tag.className = 'symptom-tag';
+                        tag.textContent = symptom;
+                        symptomsDiv.appendChild(tag);
+                    });
+                    
+                    symptomsList.appendChild(symptomsDiv);
+                    symptomsDetailed.appendChild(symptomsDiv.cloneNode(true));
+                }
+                
+                // Rules triggered
+                if (expert.rules_triggered && expert.rules_triggered.length > 0) {
+                    const rulesDiv = document.createElement('div');
+                    rulesDiv.innerHTML = '<p style="margin-top: 15px;">CLIPS rules triggered during inference:</p>';
+                    
+                    expert.rules_triggered.forEach(rule => {
+                        const tag = document.createElement('span');
+                        tag.className = 'clips-tag';
+                        tag.textContent = rule;
+                        rulesDiv.appendChild(tag);
+                    });
+                    
+                    symptomsDetailed.appendChild(rulesDiv);
+                }
+            }
+            
+            // Display stress calculation in clips tab
+            const stressCalculation = document.getElementById('stress-calculation');
+            stressCalculation.innerHTML = '';
+            
+            if (result.expert_system && result.expert_system.overall_score !== undefined) {
+                const score = result.expert_system.overall_score;
+                let level = 'Low';
+                let description = '';
+                
+                if (score >= 4.0) {
+                    level = 'Very High';
+                    description = 'Multiple high stress indicators present or total score > 80%';
+                } else if (score >= 3.0) {
+                    level = 'High';
+                    description = 'High stress indicators or total score 60-80%';
+                } else if (score >= 2.0) {
+                    level = 'Moderate';
+                    description = 'Moderate stress indicators or total score 40-60%';
+                } else {
+                    description = 'Low stress indicators or total score ≤ 40%';
+                }
+                
+                const calcDiv = document.createElement('div');
+                calcDiv.className = 'clips-result-item';
+                calcDiv.innerHTML = `
+                    <strong>Calculation:</strong><br>
+                    CLIPS Score: ${score.toFixed(1)} → ${level}<br>
+                    ${description}
+                `;
+                stressCalculation.appendChild(calcDiv);
+            }
+        }
+
+        function displayRulesTriggered(result) {
+            const rulesTriggeredContainer = document.getElementById('rules-triggered');
+            rulesTriggeredContainer.innerHTML = '';
+            
+            const traditionalRulesContainer = document.getElementById('traditional-rules');
+            traditionalRulesContainer.innerHTML = '';
+            
+            // CLIPS rules
+            if (result.expert_system && result.expert_system.rules_triggered && result.expert_system.rules_triggered.length > 0) {
+                result.expert_system.rules_triggered.forEach(rule => {
+                    const ruleDiv = document.createElement('div');
+                    ruleDiv.className = 'rule-item';
+                    ruleDiv.textContent = `CLIPS Rule: ${rule}`;
+                    rulesTriggeredContainer.appendChild(ruleDiv);
+                });
+            } else {
+                rulesTriggeredContainer.innerHTML = '<p>No CLIPS rules triggered.</p>';
+            }
+            
+            // Traditional rules
+            if (result.triggered_rules && result.triggered_rules.length > 0) {
+                const rulesList = document.createElement('ul');
+                rulesList.className = 'reasons-list';
+                
+                result.triggered_rules.forEach(rule => {
+                    const li = document.createElement('li');
+                    li.textContent = rule;
+                    rulesList.appendChild(li);
+                });
+                
+                traditionalRulesContainer.appendChild(rulesList);
+            } else {
+                traditionalRulesContainer.innerHTML = '<p>No traditional rules triggered.</p>';
+            }
+        }
+
+        function displayRecommendations(result) {
+            const recommendationsContent = document.getElementById('recommendations-content');
+            recommendationsContent.innerHTML = '';
+            
+            const recommendations = generateRecommendations(result);
+            
+            if (recommendations.length === 0) {
+                recommendationsContent.innerHTML = '<p>No specific recommendations available.</p>';
+                return;
+            }
+            
+            recommendations.forEach(rec => {
+                const recItem = document.createElement('div');
+                recItem.className = 'form-group';
+                
+                const recTitle = document.createElement('div');
+                recTitle.className = 'question-text';
+                recTitle.textContent = rec.title;
+                recItem.appendChild(recTitle);
+                
+                const recText = document.createElement('div');
+                recText.textContent = rec.text;
+                recItem.appendChild(recText);
+                
+                recommendationsContent.appendChild(recItem);
+            });
+        }
+
+        function generateRecommendations(result) {
+            const recommendations = [];
+            const stressLevel = (result.final_stress || '').toLowerCase();
+            
+            // Add CLIPS expert system recommendations
+            if (result.expert_system && result.expert_system.recommendations) {
+                result.expert_system.recommendations.forEach(rec => {
+                    recommendations.push({
+                        title: "Expert System Recommendation",
+                        text: rec
+                    });
+                });
+            }
+            
+            // Stress level based recommendations
+            if (stressLevel.includes('very high') || stressLevel.includes('high')) {
+                recommendations.push({
+                    title: "🟥 Immediate Professional Support",
+                    text: "Your stress level is high. It's recommended to seek immediate support from a counselor, mental health professional, or trusted adult. Consider reaching out to student support services."
+                });
+                
+                recommendations.push({
+                    title: "🟧 Urgent Self-Care Actions",
+                    text: "1. Take a break from stressful activities immediately\n2. Practice deep breathing exercises (4-7-8 technique)\n3. Contact a trusted friend or family member\n4. Ensure basic needs are met (sleep, food, hydration)"
+                });
+            } else if (stressLevel.includes('moderate')) {
+                recommendations.push({
+                    title: "🟨 Structured Stress Management",
+                    text: "1. Create a weekly schedule with balanced activities\n2. Practice mindfulness meditation 10 minutes daily\n3. Engage in regular physical activity\n4. Maintain a sleep schedule of 7-9 hours"
+                });
+            } else {
+                recommendations.push({
+                    title: "🟩 Maintenance and Prevention",
+                    text: "1. Continue healthy habits and routines\n2. Monitor stress levels weekly\n3. Engage in enjoyable activities regularly\n4. Build supportive social connections"
+                });
+            }
+            
+            // Section-specific recommendations
+            if (result.section_reasons) {
+                if (result.section_reasons["Mental State"] && result.section_reasons["Mental State"].length > 0) {
+                    recommendations.push({
+                        title: "🧠 Mental Health Focus",
+                        text: "Your mental health indicators show areas for attention. Consider:\n• Keeping an emotion journal\n• Practicing gratitude daily\n• Learning cognitive behavioral techniques\n• Considering professional counseling"
+                    });
+                }
+                
+                if (result.section_reasons["Physical Symptoms"] && result.section_reasons["Physical Symptoms"].length > 0) {
+                    recommendations.push({
+                        title: "💪 Physical Well-being",
+                        text: "Address physical symptoms with:\n• Regular sleep schedule\n• Balanced nutrition\n• Gentle exercise (walking, stretching)\n• Regular medical check-ups"
+                    });
+                }
+                
+                if (result.section_reasons["Academic Pressure"] && result.section_reasons["Academic Pressure"].length > 0) {
+                    recommendations.push({
+                        title: "📚 Academic Support",
+                        text: "Manage academic stress through:\n• Time management techniques\n• Breaking tasks into smaller steps\n• Seeking academic advising\n• Study groups for support"
+                    });
+                }
+                
+                if (result.section_reasons["Social Support"] && result.section_reasons["Social Support"].length > 0) {
+                    recommendations.push({
+                        title: "🤝 Social Connection",
+                        text: "Strengthen social support by:\n• Joining student organizations\n• Regular social activities\n• Open communication with friends/family\n• Peer support groups"
+                    });
+                }
+            }
+            
+            return recommendations;
+        }
+
+        function displayAssessmentOverview(result) {
+            const overviewContainer = document.getElementById('assessment-overview');
+            overviewContainer.innerHTML = '';
+            
+            let overviewText = '';
+            
+            // System information
+            overviewText += `<p><strong>Assessment System:</strong> Hybrid System (CLIPS Expert System + Traditional Rules)</p>`;
+            
+            // CLIPS system info
+            if (result.expert_system) {
+                overviewText += `<p><strong>CLIPS Expert System:</strong> ${result.expert_system.rules_triggered ? result.expert_system.rules_triggered.length : 0} rules triggered</p>`;
+            }
+            
+            // Traditional system info
+            overviewText += `<p><strong>Traditional Rules:</strong> ${result.triggered_rules ? result.triggered_rules.length : 0} rules triggered</p>`;
+            
+            // Score information
+            overviewText += `<p><strong>Total Score:</strong> ${result.total_score || 0}/${result.max_score || 0} points</p>`;
+            
+            // Final determination
+            const finalStress = result.final_stress || 'Undetermined';
+            overviewText += `<p><strong>Final Stress Level:</strong> ${finalStress} (determined by CLIPS expert system)</p>`;
+            
+            overviewContainer.innerHTML = overviewText;
+        }
+
+        // Restart assessment
+        function restartAssessment() {
+            // Reset form
+            const nameInput = document.getElementById('student-name');
+            if (nameInput) nameInput.value = '';
+            
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.checked = false;
+            });
+            
+            // Switch to intro page
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('intro-section').style.display = 'block';
+            
+            // Reset to first tab
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector('.tab[data-tab="summary"]').classList.add('active');
+            document.getElementById('summary-tab').classList.add('active');
+            
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
