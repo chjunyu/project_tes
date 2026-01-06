@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Patient Input</h5>
+        <p class="text-muted mb-3">Enter temperature and select symptoms. The system will infer fever severity and possible disease type using forward chaining.</p>
+
+        <form method="POST" action="/diagnose" id="diagForm">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Temperature (°C)</label>
+              <input class="form-control" type="number" step="0.1" name="temperature" value="37.0" required>
+              <div class="form-text">Example: 38.6</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Days suffering (Typhoid severity)</label>
+              <input class="form-control" type="number" name="days" min="0" value="0">
+              <div class="form-text">Rule: 10-14 days -> high severity</div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-2">Symptoms</h6>
+            <span class="badge text-bg-secondary" id="symCount">0 selected</span>
+          </div>
+
+          <div class="row row-cols-1 row-cols-md-2 g-2 mt-1">
+            {% for key, label in symptoms %}
+            <div class="col">
+              <label class="symptom-item">
+                <input class="form-check-input me-2 symptom-check" type="checkbox" name="symptoms" value="{{ key }}">
+                <span>{{ label }}</span>
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="mt-4 d-grid">
+            <button class="btn btn-primary btn-lg" type="submit">Diagnose</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="card-title">How it works</h5>
+        <ul class="text-muted mb-0">
+          <li>Rule-based knowledge base (your rules 1–67)</li>
+          <li>Forward chaining inference in CLIPS</li>
+          <li>Conflicting rules resolved via evidence scoring (still rule-driven)</li>
+          <li>Outputs: fever severity, likely disease, (malaria subtype if applicable)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const checks = document.querySelectorAll(".symptom-check");
+  const countBadge = document.getElementById("symCount");
+  const form = document.getElementById("diagForm");
+
+  function updateCount(){
+    const n = Array.from(checks).filter(x => x.checked).length;
+    countBadge.textContent = `${n} selected`;
+  }
+  checks.forEach(c => c.addEventListener("change", updateCount));
+  updateCount();
+
+  form.addEventListener("submit", (e) => {
+    const n = Array.from(checks).filter(x => x.checked).length;
+    if(n > 2){
+      const ok = confirm("You selected more than 2 symptoms. Confirm to proceed with diagnosis?");
+      if(!ok){
+        e.preventDefault();
+      }
+    }
+  });
+</script>
+{% endblock %}

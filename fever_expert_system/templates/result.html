@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Diagnosis Result</h4>
+  <a class="btn btn-outline-secondary" href="/">New diagnosis</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="text-muted">Inputs</h6>
+        <div class="mb-2"><b>Temperature:</b> {{ temperature }} °C</div>
+        <div class="mb-2"><b>Days suffering:</b> {{ days }}</div>
+        <div>
+          <b>Selected symptoms:</b>
+          {% if selected %}
+            <ul class="mt-2">
+              {% for s in selected %}
+                <li>{{ symptoms_dict[s] if s in symptoms_dict else s }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span class="text-muted">None</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h6 class="text-muted">Fever severity (Rules 1–4)</h6>
+        <div class="display-6">{{ result.fever_level }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-primary">
+      <div class="card-body">
+        <h6 class="text-muted">Likely Disease Type (Forward chaining + scoring)</h6>
+        <div class="display-6 text-primary">{{ result.best_disease|capitalize }}</div>
+        <div class="text-muted">Score: {{ result.best_score }}</div>
+
+        {% if result.severity_level %}
+          <hr>
+          <h6 class="text-muted mb-1">Severity for {{ result.best_disease|capitalize }}</h6>
+          <div class="fs-4">{{ result.severity_level }}</div>
+          {% if result.severity_reasons %}
+            <ul class="mt-2">
+              {% for r in result.severity_reasons %}
+              <li class="text-muted">{{ r }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endif %}
+
+        {% if result.best_disease == "malaria" and result.malaria_subtype %}
+          <hr>
+          <h6 class="text-muted mb-1">Malaria Subtype (Rules 33–56)</h6>
+          <div class="fs-3">Type: {{ result.malaria_subtype }}</div>
+          <div class="text-muted">Subtype score: {{ result.malaria_subtype_score }}</div>
+          {% if result.malaria_reasons %}
+            <ul class="mt-2">
+              {% for r in result.malaria_reasons %}
+              <li class="text-muted">{{ r }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h6 class="text-muted">Evidence (Votes)</h6>
+        <div class="row g-3">
+          {% for d in ["malaria","dengue","typhoid"] %}
+          <div class="col-md-4">
+            <div class="p-2 border rounded bg-white">
+              <div class="fw-semibold">{{ d|capitalize }}</div>
+              <div class="text-muted">Total: {{ result.disease_scores[d] }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <hr>
+        {% for d in ["malaria","dengue","typhoid"] %}
+          <details class="mb-2">
+            <summary class="fw-semibold">{{ d|capitalize }} reasons</summary>
+            {% if result.disease_reasons[d] %}
+              <ul class="mt-2">
+                {% for r in result.disease_reasons[d] %}
+                  <li class="text-muted">{{ r }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="text-muted mt-2">No evidence triggered.</div>
+            {% endif %}
+          </details>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
