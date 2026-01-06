@@ -1,141 +1,493 @@
 from flask import Flask, render_template, request, jsonify
 import json
 from typing import Dict, List, Set, Tuple
+import clips
 
 app = Flask(__name__)
 
 # ===========================
-# Expert System Rules
+# CLIPS Expert System Integration
 # ===========================
 
-Rule = Tuple[List[str], str]
-
-# Rule base: Explicit IF-THEN rules for forward chaining
-RULES: List[Rule] = [
-    (["poor_sleep", "irritability", "deadline_pressure"], "stress_high"),
-    (["persistent_fatigue", "difficulty_concentrating"], "stress_high"),
-    (["skip_meals", "racing_thoughts"], "stress_high"),
-    (["procrastination", "deadline_pressure"], "stress_moderate"),
-    (["social_withdrawal", "irritability"], "stress_moderate"),
-    (["minor_worry_only"], "stress_low"),
-    # Derive recommendations from stress level
-    (["stress_high"], "rec_breaks"),
-    (["stress_high"], "rec_counselor"),
-    (["stress_high"], "rec_sleep"),
-    (["stress_high"], "rec_time_block"),
-    (["stress_moderate"], "rec_plan"),
-    (["stress_moderate"], "rec_exercise"),
-    (["stress_moderate"], "rec_peer"),
-    (["stress_low"], "rec_monitor"),
-]
-
-# Explanation/Recommendation texts
-EXPLANATIONS: Dict[str, str] = {
-    "stress_high": "Multiple strong stress indicators, risk of burnout.",
-    "stress_moderate": "Clear stress signals, manageable with structured approach.",
-    "stress_low": "Mild stress, maintain observation.",
-    "rec_breaks": "Take 5-10 minute breaks every hour of study.",
-    "rec_counselor": "Consider discussing coping strategies with a counselor.",
-    "rec_sleep": "Maintain regular sleep schedule, avoid screens 60 minutes before bed.",
-    "rec_time_block": "Use time blocking for tasks with clear start and end times.",
-    "rec_plan": "Plan 3-5 priority tasks weekly, break them into subtasks.",
-    "rec_exercise": "Light exercise 3-4 times per week, 20-30 minutes each.",
-    "rec_peer": "Study with peers or communicate regularly to reduce isolation.",
-    "rec_monitor": "Maintain daily routine, record mood and sleep, review weekly.",
-}
-
-# Symptom mapping from questionnaire responses to expert system facts
-SYMPTOM_MAPPING = {
-    'sleep_quality': {
-        4: 'poor_sleep',
-        5: 'poor_sleep'
-    },
-    'irritability': {
-        4: 'irritability',
-        5: 'irritability'
-    },
-    'study_load': {
-        4: 'deadline_pressure',
-        5: 'deadline_pressure'
-    },
-    'depression': {
-        4: 'persistent_fatigue',
-        5: 'persistent_fatigue'
-    },
-    'academic_performance': {
-        4: 'difficulty_concentrating',
-        5: 'difficulty_concentrating'
-    },
-    'basic_needs': {
-        4: 'skip_meals',
-        5: 'skip_meals'
-    },
-    'anxiety_level': {
-        4: 'racing_thoughts',
-        5: 'racing_thoughts'
-    },
-    'future_career_concerns': {
-        4: 'procrastination',
-        5: 'procrastination'
-    },
-    'social_support': {
-        1: 'social_withdrawal',
-        2: 'social_withdrawal'
-    },
-    'peer_pressure': {
-        1: 'minor_worry_only',
-        2: 'minor_worry_only'
-    }
-}
-
-def forward_chain(initial_facts: List[str]) -> Set[str]:
-    """Forward chaining: Add conclusions when rule conditions are met until no new facts"""
-    facts: Set[str] = set(initial_facts)
-    changed = True
-    while changed:
-        changed = False
-        for conditions, conclusion in RULES:
-            if conclusion in facts:
-                continue
-            if all(cond in facts for cond in conditions):
-                facts.add(conclusion)
-                changed = True
-    return facts
-
-def classify_stress(facts: Set[str]) -> str:
-    """Determine stress level by priority"""
-    if "stress_high" in facts:
-        return "High"
-    if "stress_moderate" in facts:
-        return "Moderate"
-    if "stress_low" in facts:
-        return "Low"
-    return "Undetermined"
-
-def evaluate_stress(responses: Dict[str, int]) -> Dict[str, object]:
-    """Evaluate stress based on questionnaire responses"""
-    # Convert responses to expert system facts
-    initial_facts = []
+class CLIPSExpertSystem:
+    def __init__(self):
+        self.env = clips.Environment()
+        self.setup_knowledge_base()
     
-    for question, value in responses.items():
-        if question in SYMPTOM_MAPPING and value in SYMPTOM_MAPPING[question]:
-            initial_facts.append(SYMPTOM_MAPPING[question][value])
+    def setup_knowledge_base(self):
+        """Initialize CLIPS environment with rules and templates"""
+        
+        # 定义症状模板
+        self.env.build("""
+        (deftemplate symptom
+            (slot name (type STRING))
+            (slot value (type INTEGER)))
+        """)
+        
+        # 定义指标模板
+        self.env.build("""
+        (deftemplate metric
+            (slot name (type STRING))
+            (slot value (type FLOAT)))
+        """)
+        
+        # 定义专家系统结果模板
+        self.env.build("""
+        (deftemplate es_result
+            (slot level (type STRING))
+            (slot rule (type STRING))
+            (slot explanation (type STRING)))
+        """)
+        
+        # 定义推荐模板
+        self.env.build("""
+        (deftemplate recommendation
+            (slot id (type STRING))
+            (slot text (type STRING))
+            (slot for_level (type STRING)))
+        """)
+        
+        # 添加推荐事实
+        recommendations = [
+            ("rec_breaks", "Take 5-10 minute breaks every hour of study.", "high"),
+            ("rec_counselor", "Consider discussing coping strategies with a counselor.", "high"),
+            ("rec_sleep", "Maintain regular sleep schedule, avoid screens 60 minutes before bed.", "high"),
+            ("rec_time_block", "Use time blocking for tasks with clear start and end times.", "high"),
+            ("rec_plan", "Plan 3-5 priority tasks weekly, break them into subtasks.", "moderate"),
+            ("rec_exercise", "Light exercise 3-4 times per week, 20-30 minutes each.", "moderate"),
+            ("rec_peer", "Study with peers or communicate regularly to reduce isolation.", "moderate"),
+            ("rec_monitor", "Maintain daily routine, record mood and sleep, review weekly.", "low")
+        ]
+        
+        for rec_id, text, level in recommendations:
+            self.env.assert_string(f'(recommendation (id "{rec_id}") (text "{text}") (for_level "{level}"))')
+        
+        # ==================== 症状评估规则 ====================
+        
+        # 规则1: 睡眠质量差 + 易怒 + 截止日期压力 → 高压症状
+        self.env.build("""
+        (defrule high-stress-symptom-1
+            (symptom (name "poor_sleep") (value ?v1&:(>= ?v1 1)))
+            (symptom (name "irritability") (value ?v2&:(>= ?v2 1)))
+            (symptom (name "deadline_pressure") (value ?v3&:(>= ?v3 1)))
+            =>
+            (assert (symptom (name "stress_high_indicator") (value 1)))
+            (assert (es_result 
+                (level "high_risk") 
+                (rule "high-stress-symptom-1")
+                (explanation "Poor sleep, irritability, and deadline pressure detected")))
+        )
+        """)
+        
+        # 规则2: 持续疲劳 + 注意力不集中 → 高压症状
+        self.env.build("""
+        (defrule high-stress-symptom-2
+            (symptom (name "persistent_fatigue") (value ?v1&:(>= ?v1 1)))
+            (symptom (name "difficulty_concentrating") (value ?v2&:(>= ?v2 1)))
+            =>
+            (assert (symptom (name "stress_high_indicator") (value 1)))
+            (assert (es_result 
+                (level "high_risk") 
+                (rule "high-stress-symptom-2")
+                (explanation "Persistent fatigue and difficulty concentrating")))
+        )
+        """)
+        
+        # 规则3: 不吃饭 + 思绪纷乱 → 高压症状
+        self.env.build("""
+        (defrule high-stress-symptom-3
+            (symptom (name "skip_meals") (value ?v1&:(>= ?v1 1)))
+            (symptom (name "racing_thoughts") (value ?v2&:(>= ?v2 1)))
+            =>
+            (assert (symptom (name "stress_high_indicator") (value 1)))
+            (assert (es_result 
+                (level "high_risk") 
+                (rule "high-stress-symptom-3")
+                (explanation "Skipping meals and racing thoughts detected")))
+        )
+        """)
+        
+        # 规则4: 拖延 + 截止日期压力 → 中度压力
+        self.env.build("""
+        (defrule moderate-stress-symptom-1
+            (symptom (name "procrastination") (value ?v1&:(>= ?v1 1)))
+            (symptom (name "deadline_pressure") (value ?v2&:(>= ?v2 1)))
+            (not (symptom (name "stress_high_indicator") (value ?v)))
+            =>
+            (assert (symptom (name "stress_moderate_indicator") (value 1)))
+            (assert (es_result 
+                (level "moderate_risk") 
+                (rule "moderate-stress-symptom-1")
+                (explanation "Procrastination with deadline pressure")))
+        )
+        """)
+        
+        # 规则5: 社交退缩 + 易怒 → 中度压力
+        self.env.build("""
+        (defrule moderate-stress-symptom-2
+            (symptom (name "social_withdrawal") (value ?v1&:(>= ?v1 1)))
+            (symptom (name "irritability") (value ?v2&:(>= ?v2 1)))
+            (not (symptom (name "stress_high_indicator") (value ?v)))
+            =>
+            (assert (symptom (name "stress_moderate_indicator") (value 1)))
+            (assert (es_result 
+                (level "moderate_risk") 
+                (rule "moderate-stress-symptom-2")
+                (explanation "Social withdrawal and irritability")))
+        )
+        """)
+        
+        # 规则6: 轻度担忧 → 低压
+        self.env.build("""
+        (defrule low-stress-symptom
+            (symptom (name "minor_worry_only") (value ?v1&:(>= ?v1 1)))
+            (not (symptom (name "stress_high_indicator") (value ?v)))
+            (not (symptom (name "stress_moderate_indicator") (value ?v)))
+            =>
+            (assert (symptom (name "stress_low_indicator") (value 1)))
+            (assert (es_result 
+                (level "low_risk") 
+                (rule "low-stress-symptom")
+                (explanation "Only minor worries detected")))
+        )
+        """)
+        
+        # ==================== 总体压力等级规则 ====================
+        
+        # 规则: 存在高压指标 → 总体高压
+        self.env.build("""
+        (defrule overall-high-stress
+            (symptom (name "stress_high_indicator") (value ?v&:(>= ?v 1)))
+            =>
+            (assert (metric (name "overall") (value 4.0)))
+            (assert (es_result 
+                (level "very_high") 
+                (rule "overall-high-stress")
+                (explanation "Multiple high stress indicators present")))
+        )
+        """)
+        
+        # 规则: 存在中度压力指标 → 总体中度
+        self.env.build("""
+        (defrule overall-moderate-stress
+            (symptom (name "stress_moderate_indicator") (value ?v&:(>= ?v 1)))
+            (not (symptom (name "stress_high_indicator") (value ?v2)))
+            =>
+            (assert (metric (name "overall") (value 2.5)))
+            (assert (es_result 
+                (level "moderate") 
+                (rule "overall-moderate-stress")
+                (explanation "Moderate stress indicators present")))
+        )
+        """)
+        
+        # 规则: 存在低压指标 → 总体低压
+        self.env.build("""
+        (defrule overall-low-stress
+            (symptom (name "stress_low_indicator") (value ?v&:(>= ?v 1)))
+            (not (symptom (name "stress_high_indicator") (value ?v2)))
+            (not (symptom (name "stress_moderate_indicator") (value ?v3)))
+            =>
+            (assert (metric (name "overall") (value 1.5)))
+            (assert (es_result 
+                (level "low") 
+                (rule "overall-low-stress")
+                (explanation "Only low stress indicators present")))
+        )
+        """)
+        
+        # ==================== 基于分数的后备规则 ====================
+        
+        # 创建全局变量来跟踪总体分数是否已设置
+        self.env.build("""
+        (deftemplate overall_set
+            (slot is_set (type SYMBOL) (allowed-symbols TRUE FALSE))
+        )
+        """)
+        
+        # 修复后备规则：使用更好的方法检查事实是否存在
+        # 方案1: 使用一个标记事实来跟踪
+        self.env.build("""
+        (defrule check-overall-not-set
+            (not (metric (name "overall")))
+            =>
+            (assert (overall_set (is_set FALSE)))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule check-overall-set
+            (metric (name "overall"))
+            =>
+            (assert (overall_set (is_set TRUE)))
+        )
+        """)
+        
+        # 修复后的后备规则：使用not模式
+        self.env.build("""
+        (defrule fallback-very-high-stress
+            (metric (name "total_score") (value ?tv))
+            (metric (name "max_score") (value ?mv))
+            (not (metric (name "overall")))
+            (test (> (/ ?tv ?mv) 0.8))
+            =>
+            (assert (metric (name "overall") (value 4.0)))
+            (assert (es_result 
+                (level "very_high") 
+                (rule "fallback-score-very-high")
+                (explanation "Based on total score > 80%")))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule fallback-high-stress
+            (metric (name "total_score") (value ?tv))
+            (metric (name "max_score") (value ?mv))
+            (not (metric (name "overall")))
+            (test (and (> (/ ?tv ?mv) 0.6) (<= (/ ?tv ?mv) 0.8)))
+            =>
+            (assert (metric (name "overall") (value 3.0)))
+            (assert (es_result 
+                (level "high") 
+                (rule "fallback-score-high")
+                (explanation "Based on total score 60-80%")))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule fallback-moderate-stress
+            (metric (name "total_score") (value ?tv))
+            (metric (name "max_score") (value ?mv))
+            (not (metric (name "overall")))
+            (test (and (> (/ ?tv ?mv) 0.4) (<= (/ ?tv ?mv) 0.6)))
+            =>
+            (assert (metric (name "overall") (value 2.0)))
+            (assert (es_result 
+                (level "moderate") 
+                (rule "fallback-score-moderate")
+                (explanation "Based on total score 40-60%")))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule fallback-low-stress
+            (metric (name "total_score") (value ?tv))
+            (metric (name "max_score") (value ?mv))
+            (not (metric (name "overall")))
+            (test (<= (/ ?tv ?mv) 0.4))
+            =>
+            (assert (metric (name "overall") (value 1.0)))
+            (assert (es_result 
+                (level "low") 
+                (rule "fallback-score-low")
+                (explanation "Based on total score <= 40%")))
+        )
+        """)
+        
+        # 方案2: 创建自定义函数（更高级的解决方案）
+        # 首先定义自定义函数
+        try:
+            # 创建一个检查事实是否存在的函数
+            self.env.build("""
+            (deffunction overall-metric-exists ()
+                (find-fact ((?f metric)) (eq ?f:name "overall"))
+            )
+            """)
+        except:
+            # 如果自定义函数创建失败，使用模式匹配方法
+            print("Note: Using pattern matching instead of custom function")
+        
+        # ==================== 基于数值范围的规则 ====================
+        
+        self.env.build("""
+        (defrule rule-very-high-overall
+            (metric (name "overall") (value ?v))
+            (test (>= ?v 4.0))
+            =>
+            (assert (es_result 
+                (level "very_high") 
+                (rule "rule-very-high-overall")
+                (explanation "Overall stress score >= 4.0")))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule rule-high-overall
+            (metric (name "overall") (value ?v))
+            (test (and (>= ?v 3.0) (< ?v 4.0)))
+            =>
+            (assert (es_result 
+                (level "high") 
+                (rule "rule-high-overall")
+                (explanation "Overall stress score 3.0-3.99")))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule rule-moderate-overall
+            (metric (name "overall") (value ?v))
+            (test (and (>= ?v 2.0) (< ?v 3.0)))
+            =>
+            (assert (es_result 
+                (level "moderate") 
+                (rule "rule-moderate-overall")
+                (explanation "Overall stress score 2.0-2.99")))
+        )
+        """)
+        
+        self.env.build("""
+        (defrule rule-low-overall
+            (metric (name "overall") (value ?v))
+            (test (< ?v 2.0))
+            =>
+            (assert (es_result 
+                (level "low") 
+                (rule "rule-low-overall")
+                (explanation "Overall stress score < 2.0")))
+        )
+        """)
     
-    # Run forward chaining
-    inferred_facts = forward_chain(initial_facts)
-    
-    # Classify stress level
-    stress_level = classify_stress(inferred_facts)
-    
-    # Get recommendations
-    recommendations = [EXPLANATIONS.get(fact, fact) for fact in inferred_facts if fact.startswith("rec_")]
-    
-    return {
-        "stress_level": stress_level,
-        "inferred_facts": sorted(inferred_facts),
-        "recommendations": recommendations,
-        "initial_facts": initial_facts
-    }
+    def evaluate_responses(self, responses: Dict[str, int]) -> Dict[str, object]:
+        """Evaluate stress using CLIPS expert system"""
+        
+        # 重置环境
+        self.env.reset()
+        
+        # 转换响应为症状事实
+        symptom_mapping = {
+            'sleep_quality': {
+                4: 'poor_sleep',
+                5: 'poor_sleep'
+            },
+            'irritability': {
+                4: 'irritability',
+                5: 'irritability'
+            },
+            'study_load': {
+                4: 'deadline_pressure',
+                5: 'deadline_pressure'
+            },
+            'depression': {
+                4: 'persistent_fatigue',
+                5: 'persistent_fatigue'
+            },
+            'academic_performance': {
+                4: 'difficulty_concentrating',
+                5: 'difficulty_concentrating'
+            },
+            'basic_needs': {
+                4: 'skip_meals',
+                5: 'skip_meals'
+            },
+            'anxiety_level': {
+                4: 'racing_thoughts',
+                5: 'racing_thoughts'
+            },
+            'future_career_concerns': {
+                4: 'procrastination',
+                5: 'procrastination'
+            },
+            'social_support': {
+                1: 'social_withdrawal',
+                2: 'social_withdrawal'
+            },
+            'peer_pressure': {
+                1: 'minor_worry_only',
+                2: 'minor_worry_only'
+            }
+        }
+        
+        # 添加症状事实
+        for question, value in responses.items():
+            if question in symptom_mapping and value in symptom_mapping[question]:
+                symptom_name = symptom_mapping[question][value]
+                self.env.assert_string(f'(symptom (name "{symptom_name}") (value 1))')
+        
+        # 添加总分事实
+        total_score = sum(responses.values())
+        max_score = len(responses) * 5
+        self.env.assert_string(f'(metric (name "total_score") (value {total_score}))')
+        self.env.assert_string(f'(metric (name "max_score") (value {max_score}))')
+        
+        # 运行推理
+        self.env.run()
+        
+        # 收集结果
+        results = {
+            "stress_level": "Undetermined",
+            "overall_score": 0.0,
+            "rules_triggered": [],
+            "explanations": [],
+            "recommendations": [],
+            "symptoms_detected": [],
+            "initial_symptoms": []
+        }
+        
+        # 获取所有事实
+        for fact in self.env.facts():
+            if fact.template.name == "es_result":
+                level = str(fact["level"])
+                rule = str(fact["rule"])
+                explanation = str(fact["explanation"])
+                
+                results["rules_triggered"].append(rule)
+                results["explanations"].append(explanation)
+                
+                # 确定最终压力等级（取最高等级）
+                level_mapping = {
+                    "very_high": 4,
+                    "high": 3,
+                    "moderate": 2,
+                    "low": 1,
+                    "high_risk": 4,
+                    "moderate_risk": 3,
+                    "low_risk": 2
+                }
+                
+                current_level = results["stress_level"]
+                current_priority = level_mapping.get(current_level, 0)
+                new_priority = level_mapping.get(level, 0)
+                
+                if new_priority > current_priority:
+                    results["stress_level"] = level.replace("_risk", "").title()
+            
+            elif fact.template.name == "metric" and str(fact["name"]) == "overall":
+                results["overall_score"] = float(fact["value"])
+            
+            elif fact.template.name == "symptom":
+                symptom_name = str(fact["name"])
+                if "indicator" not in symptom_name:
+                    results["symptoms_detected"].append(symptom_name)
+                    # 也添加到初始症状列表
+                    if symptom_name in ['poor_sleep', 'irritability', 'deadline_pressure', 'persistent_fatigue', 
+                                       'difficulty_concentrating', 'skip_meals', 'racing_thoughts', 
+                                       'procrastination', 'social_withdrawal', 'minor_worry_only']:
+                        results["initial_symptoms"].append(symptom_name)
+        
+        # 获取推荐
+        stress_level_lower = results["stress_level"].lower()
+        for fact in self.env.facts():
+            if fact.template.name == "recommendation":
+                rec_level = str(fact["for_level"])
+                if rec_level in stress_level_lower or stress_level_lower in rec_level:
+                    results["recommendations"].append(str(fact["text"]))
+        
+        # 如果未确定等级，使用后备逻辑
+        if results["stress_level"] == "Undetermined":
+            score_ratio = total_score / max_score if max_score > 0 else 0
+            if score_ratio > 0.8:
+                results["stress_level"] = "Very High"
+            elif score_ratio > 0.6:
+                results["stress_level"] = "High"
+            elif score_ratio > 0.4:
+                results["stress_level"] = "Moderate"
+            else:
+                results["stress_level"] = "Low"
+        
+        return results
+
+# 创建CLIPS专家系统实例
+clips_expert = CLIPSExpertSystem()
 
 # ===========================
 # Student Class
@@ -179,9 +531,8 @@ class Student:
             "Social Support": []
         }
 
-
 # ===========================
-# Rule Engine
+# Rule Engine (保持原有规则引擎用于其他评估)
 # ===========================
 
 class RuleEngine:
@@ -206,10 +557,9 @@ class RuleEngine:
     def explain(self):
         return self.triggered_rules
 
-
-# ---------------------------
-# QUESTIONS
-# ---------------------------
+# ===========================
+# Questions and Answer Scale
+# ===========================
 
 QUESTIONS = {
     'anxiety_level': "How often do you feel anxious or tense?",
@@ -233,7 +583,6 @@ QUESTIONS = {
     'extracurricular_activities': "How often do you join extracurricular activities?",
     'bullying': "Have you experienced bullying?"
 }
-
 
 ANSWER_SCALE = {
     1: "Never / Very Good",
@@ -326,13 +675,13 @@ def score_action(s):
 
 engine.add_rule(score_rule, score_action, 10, "Overall Score")
 
-# ---------------------------
+# ===========================
 # Flask Routes
-# ---------------------------
+# ===========================
 
 @app.route('/')
 def index():
-    return render_template('index.html', questions=QUESTIONS, answer_scale=ANSWER_SCALE)
+    return render_template('indexyu.html', questions=QUESTIONS, answer_scale=ANSWER_SCALE)
 
 @app.route('/assess', methods=['POST'])
 def assess():
@@ -345,20 +694,39 @@ def assess():
         for key in responses:
             responses[key] = int(responses[key])
         
-        # Create student and run assessment
+        # Create student and run rule-based assessment
         student = Student(name, responses)
         results = engine.run(student)
         
-        # Run expert system evaluation
-        expert_results = evaluate_stress(responses)
+        # Run CLIPS expert system evaluation
+        expert_results = clips_expert.evaluate_responses(responses)
         
-        # Combine results - prefer expert system stress level if available
-        final_stress = expert_results["stress_level"] if expert_results["stress_level"] != "Undetermined" else student.final_stress
+        # Determine final stress level (优先使用CLIPS结果)
+        clips_level = expert_results["stress_level"]
+        if clips_level != "Undetermined":
+            final_stress = clips_level
+        else:
+            final_stress = student.final_stress
+        
+        # 将CLIPS结果转换为用户友好的格式
+        level_display = {
+            "Very_High": "Very High",
+            "High": "High",
+            "Moderate": "Moderate",
+            "Low": "Low",
+            "Very High": "Very High",
+            "High": "High",
+            "Moderate": "Moderate",
+            "Low": "Low"
+        }
+        final_stress_display = level_display.get(final_stress.replace(" ", "_"), final_stress)
         
         # Prepare response
         response_data = {
             'name': student.name,
-            'final_stress': final_stress,
+            'final_stress': final_stress_display,
+            'clips_stress_level': expert_results["stress_level"],
+            'clips_overall_score': expert_results["overall_score"],
             'results': results,
             'section_reasons': student.section_reasons,
             'triggered_rules': engine.explain(),
@@ -373,6 +741,6 @@ def assess():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    print("Starting Student Stress Detection System...")
+    print("Starting Student Stress Detection System with CLIPS Expert System...")
     print("Access the application at: http://127.0.0.1:5000")
     app.run(debug=True, host='127.0.0.1', port=5000)
