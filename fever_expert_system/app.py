@@ -1,9 +1,47 @@
+import os
 from flask import Flask, render_template, request
-from clips import Environment
+from clips import Environment, Router
 
-app = Flask(__name__)
+# -------------------------
+# Paths (IMPORTANT)
+# -------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-RULE_FILE = "clips_rules.clp"
+# Force Flask to use the correct folders under fever_expert_system/
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+)
+
+# Use absolute path so CLIPS can always find the rules file
+RULE_FILE = os.path.join(BASE_DIR, "clips_rules.clp")
+
+
+# -------------------------
+# CLIPS Error Router (to show real CLIPS load/parse errors)
+# -------------------------
+class CLIPSErrorRouter(Router):
+    def __init__(self):
+        super().__init__("pyerr", 10)
+        self.messages = []
+
+    def query(self, name):
+        # capture warnings + errors from CLIPS
+        return name in ("werror", "error", "warning")
+
+    def write(self, name, message):
+        self.messages.append(message)
+
+    def read(self, name):
+        return ""
+
+    def unread(self, name, count):
+        return 0
+
+    def exit(self, exitcode):
+        return
+
 
 # ---- Symptom mapping: UI checkbox name -> CLIPS symbol ----
 SYMPTOMS = [
@@ -49,8 +87,37 @@ SYMPTOMS = [
 
 
 def run_inference(temperature: float, days: int, selected_syms: list[str]):
+    """
+    Forward chaining using CLIPS (clipspy).
+    Working memory is populated by (patient ...) and (symptom ...) facts.
+    Rules assert (fever ...), (vote ...), (severity ...), (malaria_vote ...) facts.
+    """
     env = Environment()
-    env.load(RULE_FILE)
+
+    # Capture CLIPS errors/warnings to show real details
+    err_router = CLIPSErrorRouter()
+    env.add_router(err_router)
+
+    # Debug prints (see console)
+    print("=== DEBUG ===")
+    print("CWD:", os.getcwd())
+    print("BASE_DIR:", BASE_DIR)
+    print("RULE_FILE:", RULE_FILE)
+    print("RULE exists:", os.path.exists(RULE_FILE))
+    print("=============")
+
+    # Load rule base
+    try:
+        env.load(RULE_FILE)
+    except Exception as e:
+        details = "".join(err_router.messages) or "No CLIPS error output captured."
+        raise RuntimeError(
+            "CLIPS failed to load rule file.\n"
+            f"RULE_FILE: {RULE_FILE}\n"
+            "---- CLIPS DETAILS ----\n"
+            + details
+        ) from e
+
     env.reset()
 
     # Assert patient data
@@ -83,8 +150,12 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
                 disease_scores[d] += p
                 reasons[d].append(f"+{p}: {r}")
 
-    # pick best disease (tie-break: malaria > dengue > typhoid just to be deterministic)
-    ranked = sorted(disease_scores.items(), key=lambda x: (x[1], x[0] == "malaria", x[0] == "dengue"), reverse=True)
+    # Pick best disease (deterministic tie-break)
+    ranked = sorted(
+        disease_scores.items(),
+        key=lambda x: (x[1], x[0] == "malaria", x[0] == "dengue"),
+        reverse=True,
+    )
     best_disease, best_score = ranked[0]
 
     # If malaria is best, compute subtype
@@ -105,22 +176,27 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
                     subtype_scores[st] += p
                     subtype_reasons[st].append(f"+{p}: {r}")
 
-        st_ranked = sorted(subtype_scores.items(), key=lambda x: (x[1], x[0] == "PF"), reverse=True)
+        st_ranked = sorted(
+            subtype_scores.items(),
+            key=lambda x: (x[1], x[0] == "PF"),
+            reverse=True,
+        )
         malaria_subtype, malaria_subtype_score = st_ranked[0]
         malaria_reasons = subtype_reasons[malaria_subtype]
 
-    # severity extraction (collect all severities, then choose worst: veryhigh > high > low)
+    # Severity extraction (choose worst: veryhigh > high > low)
     severity_map = {"low": 1, "high": 2, "veryhigh": 3}
     found_sev = []
     for fact in env.facts():
         if fact.template.name == "severity":
-            found_sev.append({
-                "disease": str(fact["disease"]),
-                "level": str(fact["level"]),
-                "reason": str(fact["reason"])
-            })
+            found_sev.append(
+                {
+                    "disease": str(fact["disease"]),
+                    "level": str(fact["level"]),
+                    "reason": str(fact["reason"]),
+                }
+            )
 
-    # filter severity for best disease
     best_sev_level = None
     best_sev_reasons = []
     best_val = 0
@@ -176,7 +252,7 @@ def diagnose():
         days=days,
         selected=selected,
         symptoms_dict=dict(SYMPTOMS),
-        result=result
+        result=result,
     )
 
 
