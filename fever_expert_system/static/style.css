@@ -1,0 +1,18 @@
+/* 
+  Custom UI tweaks:
+  - Keep the symptom checkbox rows clickable (label acts as a card)
+  - Use subtle hover feedback to improve usability
+*/
+.symptom-item{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  padding:.55rem .75rem;
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:.75rem;
+  background:#fff;
+  cursor:pointer;
+}
+.symptom-item:hover{
+  background:rgba(0,0,0,.02);
+}

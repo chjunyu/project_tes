@@ -1,107 +1,248 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="mb-0">Diagnosis Result</h4>
-  <a class="btn btn-outline-secondary" href="/">New diagnosis</a>
-</div>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Diagnosis Result · Fever Expert System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+      <span class="navbar-brand fw-semibold">Rule-Based Expert System (Healthcare) · Fever Diagnosis</span>
+    </div>
+  </nav>
 
-<div class="row g-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h6 class="text-muted">Inputs</h6>
-        <div class="mb-2"><b>Temperature:</b> {{ temperature }} °C</div>
-        <div class="mb-2"><b>Days suffering:</b> {{ days }}</div>
-        <div>
-          <b>Selected symptoms:</b>
-          {% if selected %}
-            <ul class="mt-2">
-              {% for s in selected %}
-                <li>{{ symptoms_dict[s] if s in symptoms_dict else s }}</li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <span class="text-muted">None</span>
-          {% endif %}
-        </div>
-      </div>
+  <main class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Diagnosis Result</h4>
+      <a class="btn btn-outline-secondary" href="/">New diagnosis</a>
     </div>
 
-    <div class="card shadow-sm mt-4">
-      <div class="card-body">
-        <h6 class="text-muted">Fever severity (Rules 1–4)</h6>
-        <div class="display-6">{{ result.fever_level }}</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="card shadow-sm border-primary">
-      <div class="card-body">
-        <h6 class="text-muted">Likely Disease Type (Forward chaining + scoring)</h6>
-        <div class="display-6 text-primary">{{ result.best_disease|capitalize }}</div>
-        <div class="text-muted">Score: {{ result.best_score }}</div>
-
-        {% if result.severity_level %}
-          <hr>
-          <h6 class="text-muted mb-1">Severity for {{ result.best_disease|capitalize }}</h6>
-          <div class="fs-4">{{ result.severity_level }}</div>
-          {% if result.severity_reasons %}
-            <ul class="mt-2">
-              {% for r in result.severity_reasons %}
-              <li class="text-muted">{{ r }}</li>
-              {% endfor %}
-            </ul>
-          {% endif %}
-        {% endif %}
-
-        {% if result.best_disease == "malaria" and result.malaria_subtype %}
-          <hr>
-          <h6 class="text-muted mb-1">Malaria Subtype (Rules 33–56)</h6>
-          <div class="fs-3">Type: {{ result.malaria_subtype }}</div>
-          <div class="text-muted">Subtype score: {{ result.malaria_subtype_score }}</div>
-          {% if result.malaria_reasons %}
-            <ul class="mt-2">
-              {% for r in result.malaria_reasons %}
-              <li class="text-muted">{{ r }}</li>
-              {% endfor %}
-            </ul>
-          {% endif %}
-        {% endif %}
-      </div>
+    <div id="missingResult" class="alert alert-warning d-none">
+      No diagnosis found. Please go back and run a diagnosis first.
     </div>
 
-    <div class="card shadow-sm mt-4">
-      <div class="card-body">
-        <h6 class="text-muted">Evidence (Votes)</h6>
-        <div class="row g-3">
-          {% for d in ["malaria","dengue","typhoid"] %}
-          <div class="col-md-4">
-            <div class="p-2 border rounded bg-white">
-              <div class="fw-semibold">{{ d|capitalize }}</div>
-              <div class="text-muted">Total: {{ result.disease_scores[d] }}</div>
+    <div class="row g-4 d-none" id="resultRoot">
+      <div class="col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h6 class="text-muted">Inputs</h6>
+            <div class="mb-2"><b>Temperature:</b> <span id="tempOut"></span> °C</div>
+            <div class="mb-2"><b>Days suffering:</b> <span id="daysOut"></span></div>
+
+            <div>
+              <b>Selected symptoms:</b>
+              <ul class="mt-2" id="symptomList"></ul>
             </div>
           </div>
-          {% endfor %}
         </div>
 
-        <hr>
-        {% for d in ["malaria","dengue","typhoid"] %}
-          <details class="mb-2">
-            <summary class="fw-semibold">{{ d|capitalize }} reasons</summary>
-            {% if result.disease_reasons[d] %}
-              <ul class="mt-2">
-                {% for r in result.disease_reasons[d] %}
-                  <li class="text-muted">{{ r }}</li>
-                {% endfor %}
-              </ul>
-            {% else %}
-              <div class="text-muted mt-2">No evidence triggered.</div>
-            {% endif %}
-          </details>
-        {% endfor %}
+        <div class="card shadow-sm mt-4">
+          <div class="card-body">
+            <h6 class="text-muted">Fever severity (Rules 1–4)</h6>
+            <div class="display-6" id="feverLevelOut"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h6 class="text-muted">Likely disease (Forward chaining + scoring)</h6>
+            <div class="display-6 text-primary" id="bestDiseaseOut"></div>
+            <div class="text-muted">Score: <span id="bestScoreOut"></span></div>
+
+            <!-- Severity (only shown if truly inferred for best disease) -->
+            <div id="severityBlock" class="d-none">
+              <hr>
+              <h6 class="text-muted mb-1">
+                Severity for <span id="severityDiseaseName"></span>
+              </h6>
+              <div class="fs-4" id="severityLevelOut"></div>
+              <ul class="mt-2" id="severityReasons"></ul>
+            </div>
+
+            <!-- Malaria subtype -->
+            <div id="malariaBlock" class="d-none">
+              <hr>
+              <h6 class="text-muted mb-1">Malaria Subtype (Rules 33–56)</h6>
+              <div class="fs-3">
+                Type: <span id="malariaSubtypeOut"></span>
+              </div>
+              <div class="text-muted">
+                Subtype score: <span id="malariaSubtypeScoreOut"></span>
+              </div>
+              <ul class="mt-2" id="malariaReasons"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+          <div class="card-body">
+            <h6 class="text-muted">Evidence (Votes)</h6>
+            <div class="row g-3" id="votesRow"></div>
+
+            <hr>
+            <div id="reasonsBlocks"></div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
-{% endblock %}
+  </main>
+
+  <footer class="py-4 border-top bg-white">
+    <div class="container small text-muted">
+      Forward Chaining · CLIPS (clipspy) · Flask
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function cap(s){
+      return (s || "").toString().replace(/^./, c => c.toUpperCase());
+    }
+
+    function safeArray(x){
+      return Array.isArray(x) ? x : [];
+    }
+
+    function renderList(listEl, items){
+      listEl.innerHTML = "";
+      safeArray(items).forEach(text => {
+        const li = document.createElement("li");
+        li.className = "text-muted";
+        li.textContent = text;
+        listEl.appendChild(li);
+      });
+    }
+
+    async function loadSymptomDict(){
+      const res = await fetch("/api/symptoms");
+      if(!res.ok) return {};
+      const data = await res.json();
+      const dict = {};
+      safeArray(data.symptoms).forEach(({key, label}) => dict[key] = label);
+      return dict;
+    }
+
+    (async () => {
+      const raw = sessionStorage.getItem("fever_diagnosis_result");
+      if(!raw){
+        document.getElementById("missingResult").classList.remove("d-none");
+        return;
+      }
+
+      const data = JSON.parse(raw);
+      const symptomDict = await loadSymptomDict();
+
+      const input = data.input || {};
+      const result = data.result || {};
+
+      document.getElementById("resultRoot").classList.remove("d-none");
+
+      document.getElementById("tempOut").textContent = input.temperature ?? "";
+      document.getElementById("daysOut").textContent = input.days ?? "";
+
+      const symptomList = document.getElementById("symptomList");
+      symptomList.innerHTML = "";
+      safeArray(input.symptoms).forEach(key => {
+        const li = document.createElement("li");
+        li.textContent = symptomDict[key] || key;
+        symptomList.appendChild(li);
+      });
+
+      document.getElementById("feverLevelOut").textContent =
+        result.fever_level ?? "Unknown";
+
+      document.getElementById("bestDiseaseOut").textContent =
+        cap(result.best_disease);
+      document.getElementById("bestScoreOut").textContent =
+        result.best_score ?? 0;
+
+      /* -------- Severity: ONLY show if expert system really inferred it -------- */
+      if (
+        result.severity_level &&
+        Array.isArray(result.severity_reasons) &&
+        result.severity_reasons.length > 0
+      ) {
+        document.getElementById("severityBlock").classList.remove("d-none");
+        document.getElementById("severityDiseaseName").textContent =
+          cap(result.best_disease);
+        document.getElementById("severityLevelOut").textContent =
+          result.severity_level;
+        renderList(
+          document.getElementById("severityReasons"),
+          result.severity_reasons
+        );
+      }
+
+      /* -------- Malaria subtype -------- */
+      if (result.best_disease === "malaria" && result.malaria_subtype) {
+        document.getElementById("malariaBlock").classList.remove("d-none");
+        document.getElementById("malariaSubtypeOut").textContent =
+          result.malaria_subtype;
+        document.getElementById("malariaSubtypeScoreOut").textContent =
+          result.malaria_subtype_score ?? 0;
+        renderList(
+          document.getElementById("malariaReasons"),
+          result.malaria_reasons
+        );
+      }
+
+      /* -------- Evidence (votes) -------- */
+      const diseases = ["malaria","dengue","typhoid"];
+      const votesRow = document.getElementById("votesRow");
+      votesRow.innerHTML = "";
+
+      diseases.forEach(d => {
+        const score = result.disease_scores?.[d] ?? 0;
+        const col = document.createElement("div");
+        col.className = "col-md-4";
+        col.innerHTML = `
+          <div class="p-2 border rounded bg-white">
+            <div class="fw-semibold">${cap(d)}</div>
+            <div class="display-6">${score}</div>
+            <div class="small text-muted">votes</div>
+          </div>
+        `;
+        votesRow.appendChild(col);
+      });
+
+      const reasonsBlocks = document.getElementById("reasonsBlocks");
+      reasonsBlocks.innerHTML = "";
+
+      diseases.forEach(d => {
+        const wrapper = document.createElement("details");
+        wrapper.className = "mb-2";
+
+        const summary = document.createElement("summary");
+        summary.className = "fw-semibold";
+        summary.textContent = `${cap(d)} reasons`;
+        wrapper.appendChild(summary);
+
+        const reasons = result.disease_reasons?.[d] ?? [];
+        if(reasons.length){
+          const ul = document.createElement("ul");
+          ul.className = "mt-2";
+          reasons.forEach(r => {
+            const li = document.createElement("li");
+            li.className = "text-muted";
+            li.textContent = r;
+            ul.appendChild(li);
+          });
+          wrapper.appendChild(ul);
+        } else {
+          const div = document.createElement("div");
+          div.className = "text-muted mt-2";
+          div.textContent = "No evidence triggered.";
+          wrapper.appendChild(div);
+        }
+
+        reasonsBlocks.appendChild(wrapper);
+      });
+    })();
+  </script>
+</body>
+</html>
