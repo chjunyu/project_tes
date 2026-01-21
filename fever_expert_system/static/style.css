@@ -1,18 +1,21 @@
-/* 
-  Custom UI tweaks:
-  - Keep the symptom checkbox rows clickable (label acts as a card)
-  - Use subtle hover feedback to improve usability
-*/
-.symptom-item{
-  display:flex;
-  align-items:center;
-  gap:.5rem;
-  padding:.55rem .75rem;
-  border:1px solid rgba(0,0,0,.1);
-  border-radius:.75rem;
-  background:#fff;
-  cursor:pointer;
+/* Base */
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* Interview card */
+.interview-card{
+  box-shadow: 0 1px 0 rgba(0,0,0,.03);
 }
-.symptom-item:hover{
-  background:rgba(0,0,0,.02);
+
+/* Review box */
+.review-box{
+  border: 1px solid rgba(0,0,0,.1);
+  border-radius: 1rem;
+  padding: .75rem 1rem;
+  background: #fff;
+}
+.review-box > summary{
+  cursor: pointer;
+}
+.review-box[open]{
+  box-shadow: 0 1px 0 rgba(0,0,0,.03);
 }

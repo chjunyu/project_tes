@@ -15,15 +15,23 @@
   </nav>
 
   <main class="container my-4">
-    <div class="row g-4">
-      <div class="col-lg-7">
+    <div class="row justify-content-center">
+      <div class="col-lg-9 col-xl-8">
         <div class="card shadow-sm">
           <div class="card-body">
-            <h5 class="card-title">Patient Input</h5>
-            <p class="text-muted mb-3">
-              Enter temperature and select symptoms. The system will infer fever level, likely disease,
-              and (if applicable) malaria subtype using forward chaining rules.
-            </p>
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+              <div>
+                <h5 class="card-title mb-1">Patient Interview</h5>
+                <div class="text-muted">
+                  Answer the questions below. The system will infer fever level, likely disease, and (if applicable) malaria subtype.
+                </div>
+              </div>
+              <div class="text-end">
+                <span class="badge text-bg-secondary" id="symCount">0 positive</span>
+              </div>
+            </div>
+
+            <hr class="my-4">
 
             <form id="diagForm">
               <div class="row g-3">
@@ -42,96 +50,215 @@
 
               <hr class="my-4">
 
-              <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-2">Symptoms</h6>
-                <span class="badge text-bg-secondary" id="symCount">0 selected</span>
+              <!-- Interview / Questionnaire -->
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="fw-semibold">Symptom Interview</div>
+                  <div class="text-muted small">
+                    <span id="progressText">0 / 0</span>
+                  </div>
+                </div>
+
+                <div class="progress mt-2" style="height: 10px;">
+                  <div class="progress-bar" role="progressbar" id="progressBar" style="width: 0%;"></div>
+                </div>
               </div>
 
-              <div class="row row-cols-1 row-cols-md-2 g-2 mt-1" id="symptomGrid"></div>
+              <div class="interview-card border rounded-4 bg-white p-3 p-md-4">
+                <div class="small text-muted mb-2" id="questionHint">Question</div>
+                <div class="fs-4 fw-semibold mb-3" id="questionText">Loading…</div>
+
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                  <button type="button" class="btn btn-success btn-lg flex-fill" id="btnYes">Yes</button>
+                  <button type="button" class="btn btn-outline-secondary btn-lg flex-fill" id="btnNo">No</button>
+                  <button type="button" class="btn btn-outline-warning btn-lg flex-fill" id="btnSkip">Skip</button>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                  <button type="button" class="btn btn-outline-secondary" id="btnPrev">← Prev</button>
+
+                  <div class="text-muted small">
+                    Current answer:
+                    <span class="fw-semibold" id="currentAnswer">—</span>
+                  </div>
+
+                  <button type="button" class="btn btn-outline-secondary" id="btnNext">Next →</button>
+                </div>
+              </div>
+
+              <!-- Quick review -->
+              <div class="mt-4">
+                <details class="review-box">
+                  <summary class="fw-semibold">Review positive symptoms</summary>
+                  <div class="mt-2 text-muted small">
+                    These are the symptoms answered “Yes”. (Only “Yes” will be sent to the rule engine.)
+                  </div>
+                  <ul class="mt-2 mb-0" id="positiveList"></ul>
+                </details>
+              </div>
 
               <div class="mt-4 d-grid">
                 <button class="btn btn-primary btn-lg" type="submit" id="submitBtn">Diagnose</button>
               </div>
             </form>
-          </div>
-        </div>
-      </div>
 
-      <div class="col-lg-5">
-        <div class="card shadow-sm">
-          <div class="card-body">
-            <h5 class="card-title">How it works</h5>
-            <ul class="text-muted mb-0">
-              <li>Rule-based knowledge base (CLIPS rules)</li>
-              <li>Forward chaining inference in CLIPS</li>
-              <li>Conflicting rules resolved via evidence scoring (still rule-driven)</li>
-              <li>Outputs: fever severity, likely disease, malaria subtype (if applicable)</li>
-            </ul>
           </div>
         </div>
 
-        <div class="alert alert-info mt-4 mb-0">
-          <div class="fw-semibold">Tip</div>
-          <div class="small">
-            Select symptoms based on patient observation. The system’s “votes” show how much evidence
-            each disease accumulated from triggered rules.
-          </div>
+        <div class="small text-muted mt-3">
+          Forward Chaining · CLIPS (clipspy) · Flask
         </div>
       </div>
     </div>
   </main>
 
-  <footer class="py-4 border-top bg-white">
-    <div class="container small text-muted">
-      Forward Chaining · CLIPS (clipspy) · Flask
-    </div>
-  </footer>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const symptomGrid = document.getElementById("symptomGrid");
-    const countBadge = document.getElementById("symCount");
     const form = document.getElementById("diagForm");
     const submitBtn = document.getElementById("submitBtn");
 
-    function getCheckedSymptoms(){
-      return Array.from(document.querySelectorAll(".symptom-check"))
-        .filter(x => x.checked)
-        .map(x => x.value);
+    const symCount = document.getElementById("symCount");
+    const positiveList = document.getElementById("positiveList");
+
+    const questionText = document.getElementById("questionText");
+    const progressText = document.getElementById("progressText");
+    const progressBar = document.getElementById("progressBar");
+    const currentAnswer = document.getElementById("currentAnswer");
+
+    const btnYes = document.getElementById("btnYes");
+    const btnNo = document.getElementById("btnNo");
+    const btnSkip = document.getElementById("btnSkip");
+    const btnPrev = document.getElementById("btnPrev");
+    const btnNext = document.getElementById("btnNext");
+
+    let questions = []; // [{key,label}]
+    let idx = 0;
+    // answers: key -> "yes" | "no" | "skip" (or undefined)
+    const answers = {};
+
+    function cap(s){
+      return (s || "").toString().replace(/^./, c => c.toUpperCase());
     }
 
-    function updateCount(){
-      const n = getCheckedSymptoms().length;
-      countBadge.textContent = `${n} selected`;
+    function questionSentence(label){
+      // keep simple English prompt; you can swap to Chinese if needed
+      return `Does the patient have ${label}?`;
     }
 
-    async function loadSymptoms(){
+    function getYesKeys(){
+      return Object.entries(answers)
+        .filter(([_, v]) => v === "yes")
+        .map(([k]) => k);
+    }
+
+    function updateReview(){
+      const yesKeys = getYesKeys();
+      symCount.textContent = `${yesKeys.length} positive`;
+
+      positiveList.innerHTML = "";
+      if(!yesKeys.length){
+        const li = document.createElement("li");
+        li.className = "text-muted";
+        li.textContent = "None yet.";
+        positiveList.appendChild(li);
+        return;
+      }
+
+      const dict = Object.fromEntries(questions.map(q => [q.key, q.label]));
+      yesKeys.forEach(k => {
+        const li = document.createElement("li");
+        li.textContent = dict[k] || k;
+        positiveList.appendChild(li);
+      });
+    }
+
+    function updateProgress(){
+      const total = questions.length || 0;
+      progressText.textContent = `${Math.min(idx+1,total)} / ${total}`;
+      const pct = total ? Math.round(((idx+1) / total) * 100) : 0;
+      progressBar.style.width = `${pct}%`;
+    }
+
+    function updateCurrentAnswer(){
+      const q = questions[idx];
+      const v = answers[q?.key];
+      if(v === "yes") currentAnswer.textContent = "Yes";
+      else if(v === "no") currentAnswer.textContent = "No";
+      else if(v === "skip") currentAnswer.textContent = "Skip";
+      else currentAnswer.textContent = "—";
+    }
+
+    function renderQuestion(){
+      if(!questions.length){
+        questionText.textContent = "No symptoms loaded.";
+        return;
+      }
+
+      const q = questions[idx];
+      questionText.textContent = questionSentence(q.label);
+
+      btnPrev.disabled = (idx === 0);
+      btnNext.disabled = (idx === questions.length - 1);
+
+      updateProgress();
+      updateCurrentAnswer();
+      updateReview();
+    }
+
+    function setAnswer(value){
+      const q = questions[idx];
+      if(!q) return;
+      answers[q.key] = value;
+      renderQuestion();
+    }
+
+    function next(){
+      if(idx < questions.length - 1){
+        idx += 1;
+        renderQuestion();
+      }
+    }
+
+    function prev(){
+      if(idx > 0){
+        idx -= 1;
+        renderQuestion();
+      }
+    }
+
+    async function loadSymptomsAsQuestions(){
       const res = await fetch("/api/symptoms");
       if(!res.ok) throw new Error("Failed to load symptoms");
       const data = await res.json();
 
-      symptomGrid.innerHTML = "";
-      (data.symptoms || []).forEach(({key, label}) => {
-        const col = document.createElement("div");
-        col.className = "col";
-        col.innerHTML = `
-          <label class="symptom-item">
-            <input class="form-check-input me-2 symptom-check" type="checkbox" value="${key}">
-            <span>${label}</span>
-          </label>
-        `;
-        symptomGrid.appendChild(col);
-      });
-
-      document.querySelectorAll(".symptom-check")
-        .forEach(c => c.addEventListener("change", updateCount));
-      updateCount();
+      // Keep original order (same as backend SYMPTOMS list)
+      questions = (data.symptoms || []).map(x => ({key: x.key, label: x.label}));
+      idx = 0;
+      renderQuestion();
     }
+
+    btnYes.addEventListener("click", () => { setAnswer("yes"); next(); });
+    btnNo.addEventListener("click", () => { setAnswer("no"); next(); });
+    btnSkip.addEventListener("click", () => { setAnswer("skip"); next(); });
+
+    btnPrev.addEventListener("click", prev);
+    btnNext.addEventListener("click", next);
+
+    // keyboard shortcuts: Y / N / S, arrows
+    document.addEventListener("keydown", (e) => {
+      if(e.key === "ArrowLeft") return prev();
+      if(e.key === "ArrowRight") return next();
+
+      const k = e.key.toLowerCase();
+      if(k === "y") { setAnswer("yes"); next(); }
+      if(k === "n") { setAnswer("no"); next(); }
+      if(k === "s") { setAnswer("skip"); next(); }
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const selected = getCheckedSymptoms();
+      const selectedYes = getYesKeys();
 
       submitBtn.disabled = true;
       submitBtn.textContent = "Diagnosing...";
@@ -140,7 +267,7 @@
         const payload = {
           temperature: Number(form.temperature.value),
           days: Number(form.days.value || 0),
-          symptoms: selected
+          symptoms: selectedYes
         };
 
         const res = await fetch("/api/diagnose", {
@@ -165,9 +292,9 @@
       }
     });
 
-    loadSymptoms().catch(err => {
+    loadSymptomsAsQuestions().catch(err => {
       console.error(err);
-      symptomGrid.innerHTML = "<div class='text-danger'>Failed to load symptoms.</div>";
+      questionText.textContent = "Failed to load symptoms.";
     });
   </script>
 </body>
