@@ -1,12 +1,9 @@
-/* Base */
 body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
-/* Interview card */
 .interview-card{
   box-shadow: 0 1px 0 rgba(0,0,0,.03);
 }
 
-/* Review box */
 .review-box{
   border: 1px solid rgba(0,0,0,.1);
   border-radius: 1rem;

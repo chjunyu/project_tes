@@ -41,7 +41,7 @@ class CLIPSErrorRouter(Router):
 
 
 # -------------------------
-# Symptom mapping (checkbox key -> label)
+# Symptom mapping
 # key 必须和 CLIPS 的 (symptom (name <key>)) 一致
 # -------------------------
 SYMPTOMS = [
@@ -92,19 +92,13 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
     We assert:
       - (patient (temperature X) (days Y))
       - (symptom (name <key>))
-
-    Rules assert:
-      - (fever (level ...))
-      - (vote (disease ...) (points ...) (reason ...))
-      - (severity (disease ...) (level ...) (reason ...))
-      - (malaria_vote (subtype ...) (points ...) (reason ...))
     """
-    env = Environment()
 
+    env = Environment()
     err_router = CLIPSErrorRouter()
     env.add_router(err_router)
 
-    # Debug prints (useful for rule file path issues)
+    # Debug prints
     print("=== DEBUG ===")
     print("CWD:", os.getcwd())
     print("BASE_DIR:", BASE_DIR)
@@ -155,7 +149,6 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
                 disease_scores[d] += p
                 disease_reasons[d].append(f"+{p}: {r}")
 
-    # deterministic tie-break: score desc, then malaria>dengue>typhoid (optional)
     ranked = sorted(
         disease_scores.items(),
         key=lambda x: (x[1], x[0] == "malaria", x[0] == "dengue"),
@@ -163,14 +156,18 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
     )
     best_disease, best_score = ranked[0]
 
+    # ✅ FIX: no evidence => no forced diagnosis
+    if best_score <= 0:
+        best_disease = "unknown"
+
     # -------------------------
-    # Malaria subtype (only meaningful if malaria wins)
+    # Malaria subtype (only meaningful if malaria wins WITH evidence)
     # -------------------------
     malaria_subtype = None
     malaria_subtype_score = 0
     malaria_reasons = []
 
-    if best_disease == "malaria":
+    if best_disease == "malaria" and best_score > 0:
         subtype_scores = {"PF": 0, "PV": 0, "PO": 0, "PM": 0}
         subtype_reasons = {"PF": [], "PV": [], "PO": [], "PM": []}
 
@@ -192,7 +189,7 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
         malaria_reasons = subtype_reasons[malaria_subtype]
 
     # -------------------------
-    # Severity (FIXED):
+    # Severity:
     # only take severity facts that match best_disease,
     # and select the worst level (veryhigh > high > low)
     # -------------------------
@@ -201,24 +198,26 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
     severity_level = None
     severity_reasons = []
 
-    for fact in env.facts():
-        if fact.template.name != "severity":
-            continue
+    # If unknown, we do not report severity (optional)
+    if best_disease != "unknown":
+        for fact in env.facts():
+            if fact.template.name != "severity":
+                continue
 
-        d = str(fact["disease"])
-        if d != best_disease:
-            continue
+            d = str(fact["disease"])
+            if d != best_disease:
+                continue
 
-        lvl = str(fact["level"])
-        val = severity_map.get(lvl, 0)
-        reason = str(fact["reason"])
+            lvl = str(fact["level"])
+            val = severity_map.get(lvl, 0)
+            reason = str(fact["reason"])
 
-        if val > best_sev_val:
-            best_sev_val = val
-            severity_level = lvl
-            severity_reasons = [reason]
-        elif val == best_sev_val and val != 0:
-            severity_reasons.append(reason)
+            if val > best_sev_val:
+                best_sev_val = val
+                severity_level = lvl
+                severity_reasons = [reason]
+            elif val == best_sev_val and val != 0:
+                severity_reasons.append(reason)
 
     return {
         "fever_level": fever_level,
@@ -236,7 +235,7 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
 
 
 # -------------------------
-# Pages: serve plain HTML (no template engine)
+# Pages: serve plain HTML
 # -------------------------
 @app.get("/")
 def index():
@@ -250,7 +249,6 @@ def result_page():
 
 @app.get("/diagnose")
 def diagnose_redirect():
-    # prevents manual /diagnose browsing from showing 404
     return redirect("/")
 
 

@@ -50,7 +50,6 @@
 
               <hr class="my-4">
 
-              <!-- Interview / Questionnaire -->
               <div class="mb-3">
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="fw-semibold">Symptom Interview</div>
@@ -65,13 +64,12 @@
               </div>
 
               <div class="interview-card border rounded-4 bg-white p-3 p-md-4">
-                <div class="small text-muted mb-2" id="questionHint">Question</div>
+                <div class="small text-muted mb-2">Question</div>
                 <div class="fs-4 fw-semibold mb-3" id="questionText">Loading…</div>
 
                 <div class="d-flex flex-column flex-sm-row gap-2">
                   <button type="button" class="btn btn-success btn-lg flex-fill" id="btnYes">Yes</button>
                   <button type="button" class="btn btn-outline-secondary btn-lg flex-fill" id="btnNo">No</button>
-                  <button type="button" class="btn btn-outline-warning btn-lg flex-fill" id="btnSkip">Skip</button>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mt-3">
@@ -86,7 +84,6 @@
                 </div>
               </div>
 
-              <!-- Quick review -->
               <div class="mt-4">
                 <details class="review-box">
                   <summary class="fw-semibold">Review positive symptoms</summary>
@@ -127,21 +124,16 @@
 
     const btnYes = document.getElementById("btnYes");
     const btnNo = document.getElementById("btnNo");
-    const btnSkip = document.getElementById("btnSkip");
     const btnPrev = document.getElementById("btnPrev");
     const btnNext = document.getElementById("btnNext");
 
     let questions = []; // [{key,label}]
     let idx = 0;
-    // answers: key -> "yes" | "no" | "skip" (or undefined)
+
+    // answers: key -> "yes" | "no" (or undefined if not answered)
     const answers = {};
 
-    function cap(s){
-      return (s || "").toString().replace(/^./, c => c.toUpperCase());
-    }
-
     function questionSentence(label){
-      // keep simple English prompt; you can swap to Chinese if needed
       return `Does the patient have ${label}?`;
     }
 
@@ -184,7 +176,6 @@
       const v = answers[q?.key];
       if(v === "yes") currentAnswer.textContent = "Yes";
       else if(v === "no") currentAnswer.textContent = "No";
-      else if(v === "skip") currentAnswer.textContent = "Skip";
       else currentAnswer.textContent = "—";
     }
 
@@ -231,33 +222,35 @@
       if(!res.ok) throw new Error("Failed to load symptoms");
       const data = await res.json();
 
-      // Keep original order (same as backend SYMPTOMS list)
       questions = (data.symptoms || []).map(x => ({key: x.key, label: x.label}));
       idx = 0;
       renderQuestion();
     }
 
+    // Button behavior:
+    // - Clicking Yes/No records the answer and advances to next question.
     btnYes.addEventListener("click", () => { setAnswer("yes"); next(); });
-    btnNo.addEventListener("click", () => { setAnswer("no"); next(); });
-    btnSkip.addEventListener("click", () => { setAnswer("skip"); next(); });
+    btnNo.addEventListener("click",  () => { setAnswer("no");  next(); });
 
     btnPrev.addEventListener("click", prev);
     btnNext.addEventListener("click", next);
 
-    // keyboard shortcuts: Y / N / S, arrows
+    // Keyboard:
+    // - Y / N answer + next
+    // - Left/Right navigate
     document.addEventListener("keydown", (e) => {
       if(e.key === "ArrowLeft") return prev();
       if(e.key === "ArrowRight") return next();
 
       const k = e.key.toLowerCase();
       if(k === "y") { setAnswer("yes"); next(); }
-      if(k === "n") { setAnswer("no"); next(); }
-      if(k === "s") { setAnswer("skip"); next(); }
+      if(k === "n") { setAnswer("no");  next(); }
     });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
+      // Only submit YES symptoms to keep rule engine unchanged
       const selectedYes = getYesKeys();
 
       submitBtn.disabled = true;
