@@ -156,7 +156,6 @@ def run_inference(temperature: float, days: int, selected_syms: list[str]):
     )
     best_disease, best_score = ranked[0]
 
-    # ✅ FIX: no evidence => no forced diagnosis
     if best_score <= 0:
         best_disease = "unknown"
 
